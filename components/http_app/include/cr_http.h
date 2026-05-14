@@ -29,8 +29,8 @@ void cr_app_register_routes(httpd_handle_t server);
 
 // App extension hook: invoked once near the end of app_main() after the
 // chassis is fully initialized (config, wifi, http, time, storage, led).
-// Apps put their own initialization here — BLE start, sensor tasks, custom
-// timers, etc. The chassis ships a weak no-op default.
+// Apps put their own initialization here — sensor drivers, BLE init,
+// custom timers, etc. The chassis ships a weak no-op default.
 void cr_app_init(void);
 
 #ifdef __cplusplus

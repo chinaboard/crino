@@ -41,8 +41,10 @@ esp_err_t cr_config_set_wifi(const char *ssid, const char *password);
 esp_err_t cr_config_get_wifi(char *ssid_out, size_t ssid_cap,
                               char *pass_out, size_t pass_cap);
 
-// BLE advertising name (visible in iPhone Bluetooth settings).
-// Default is "crino-XXXX" with last 2 BT MAC bytes if not set.
+// Friendly device name shown in the chassis Web UI status panel and
+// embedded in /api/system/status. Apps that need this name elsewhere
+// (BLE advertising name, mDNS instance, sensor labels, …) read it
+// via cr_config_get_device_name().
 #define CR_DEVICE_NAME_MAX 20
 esp_err_t cr_config_get_device_name(char *out, size_t cap);
 esp_err_t cr_config_set_device_name(const char *name);

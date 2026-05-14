@@ -22,7 +22,7 @@ static inline const char *cr_chip_model_str(esp_chip_model_t m)
     }
 }
 
-// Format a 6-byte BLE / WiFi address as "xx:xx:xx:xx:xx:xx" (17 chars + NUL).
+// Format a 6-byte MAC address as "xx:xx:xx:xx:xx:xx" (17 chars + NUL).
 // Caller passes a buffer of at least 18 bytes.
 static inline void cr_format_mac(const uint8_t addr[6], char out[18])
 {

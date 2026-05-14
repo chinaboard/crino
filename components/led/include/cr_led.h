@@ -22,12 +22,13 @@ bool      cr_led_is_enabled(void);
 
 // App extension hook: return true to make the LED show the BUSY state
 // (cyan fast-blink on RGB / DUTY_BLINK on PWM). Useful for transient
-// foreground operations like "BLE pairing window open" or "OTA upload in
-// progress". The chassis ships a weak default that always returns false.
+// foreground operations like "OTA upload in progress", "pairing window
+// open", "sensor calibration running", etc. The chassis ships a weak
+// default that always returns false.
 //
 // Override by defining a non-weak version in your app:
 //
-//     bool cr_app_led_busy(void) { return my_pairing_active; }
+//     bool cr_app_led_busy(void) { return my_op_in_progress; }
 bool cr_app_led_busy(void);
 
 #ifdef __cplusplus

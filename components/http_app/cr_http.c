@@ -40,8 +40,17 @@ static void delayed_restart_task(void *arg)
 
 void schedule_restart(int delay_ms)
 {
-    xTaskCreate(delayed_restart_task, "restart", 2048,
-                (void *)(intptr_t)delay_ms, 5, NULL);
+    BaseType_t rc = xTaskCreate(delayed_restart_task, "restart", 2048,
+                                (void *)(intptr_t)delay_ms, 5, NULL);
+    if (rc != pdPASS) {
+        // Low heap — can't spawn the delayed task. Restart inline so the
+        // caller's "OK, restarting" reply isn't a lie. Tiny delay so the
+        // HTTP response has a chance to flush.
+        ESP_LOGE(TAG, "xTaskCreate(restart) failed (rc=%d) — restarting inline",
+                 (int)rc);
+        vTaskDelay(pdMS_TO_TICKS(200));
+        esp_restart();
+    }
 }
 
 esp_err_t reply_json_status(httpd_req_t *req, const char *status, cJSON *body)
@@ -49,8 +58,19 @@ esp_err_t reply_json_status(httpd_req_t *req, const char *status, cJSON *body)
     httpd_resp_set_status(req, status);
     httpd_resp_set_type(req, "application/json");
     char *s = cJSON_PrintUnformatted(body);
-    esp_err_t r = httpd_resp_send(req, s, HTTPD_RESP_USE_STRLEN);
-    free(s);
+    esp_err_t r;
+    if (s) {
+        r = httpd_resp_send(req, s, HTTPD_RESP_USE_STRLEN);
+        free(s);
+    } else {
+        // Low heap — cJSON couldn't serialize. Don't pass NULL to
+        // httpd_resp_send (crash). Reply with a small error string so
+        // the caller knows it failed instead of getting nothing back.
+        ESP_LOGE(TAG, "reply_json_status: cJSON_PrintUnformatted returned NULL");
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "text/plain; charset=utf-8");
+        r = httpd_resp_send(req, "oom", HTTPD_RESP_USE_STRLEN);
+    }
     cJSON_Delete(body);
     return r;
 }
@@ -65,8 +85,10 @@ esp_err_t reply_text(httpd_req_t *req, const char *status, const char *msg)
 cJSON *recv_json_body(httpd_req_t *req)
 {
     int total = req->content_len;
-    // 8KB cap — large enough for backup JSON with 32 workers (~3KB) plus
-    // some headroom; small enough not to blow heap on bogus uploads.
+    // 8KB cap — enough for the chassis backup JSON (wifi + admin blob ~600B)
+    // plus generous headroom for any app endpoint that wants to POST larger
+    // payloads. Apps with bigger payload needs should add their own
+    // handler with a custom buffer.
     if (total <= 0 || total > 8192) return NULL;
     char *buf = malloc(total + 1);
     if (!buf) return NULL;
@@ -217,7 +239,7 @@ esp_err_t cr_http_start(void)
     httpd_register_err_handler(s_server, HTTPD_404_NOT_FOUND, not_found_redirect);
 
     // App extension hook: a downstream app overrides this weak symbol to
-    // register its own routes (BTHome broadcaster, sensor endpoints, etc.).
+    // register its own routes (sensor endpoints, custom commands, etc.).
     // The default no-op lets crino boot standalone as a pure WiFi/OTA/UI
     // chassis with no app-specific endpoints.
     cr_app_register_routes(s_server);

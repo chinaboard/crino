@@ -153,10 +153,11 @@ static void dump_chip(void)
 }
 
 // Weak app start hook: invoked once near the end of app_main, after the
-// chassis (config / wifi / http / time / storage / led) is fully up. This is
-// where downstream apps initialize their own subsystems (BLE, sensors,
-// custom timers, etc.). The chassis ships a no-op default so a bare crino
-// build still boots and serves the chassis Web UI.
+// chassis (config / wifi / http / time / storage / led) is fully up. This
+// is where downstream apps initialize their own subsystems (sensor
+// drivers, BLE init, custom timers, etc.). The chassis ships a no-op
+// default so a bare crino build still boots and serves the chassis
+// Web UI.
 __attribute__((weak)) void cr_app_init(void) { }
 
 void app_main(void)

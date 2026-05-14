@@ -19,6 +19,13 @@ esp_err_t cr_storage_init(void)
     esp_vfs_littlefs_conf_t conf = {
         .base_path = CR_STORAGE_MOUNT,
         .partition_label = PARTITION_LABEL,
+        // Auto-format on mount failure. Required so a freshly-flashed
+        // device boots — there's no FS to mount until the first format.
+        // Trade-off: a genuine corruption event (which IDF and littlefs
+        // both log loudly at WARN) will also trigger a wipe. The chassis
+        // accepts this in exchange for a working out-of-box experience;
+        // apps with critical persisted data should ensure backups (the
+        // chassis's /api/system/backup covers WiFi/admin state).
         .format_if_mount_failed = true,
         .dont_mount = false,
     };
