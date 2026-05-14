@@ -647,8 +647,9 @@ esp_err_t diag_get(httpd_req_t *req)
 
     cJSON_AddNumberToObject(j, "uptime_s", esp_timer_get_time() / 1000000);
 
-    // Per-slot view: walk both ota_0/ota_1, read each app_desc and report
-    // version + which one is running / which one OTA would write to next.
+    // Per-slot view: walk every app partition (factory + ota_0/ota_1
+    // when present), read each app_desc and report version + which one
+    // is running / which one OTA would write to next.
     const esp_partition_t *running = esp_ota_get_running_partition();
     const esp_partition_t *next    = esp_ota_get_next_update_partition(NULL);
     cJSON *ota = cJSON_CreateObject();
@@ -657,10 +658,13 @@ esp_err_t diag_get(httpd_req_t *req)
         ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
     while (it) {
         const esp_partition_t *p = esp_partition_get(it);
-        if (p->subtype >= ESP_PARTITION_SUBTYPE_APP_OTA_0 &&
-            p->subtype <= ESP_PARTITION_SUBTYPE_APP_OTA_15) {
+        bool is_factory = (p->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY);
+        bool is_ota_slot = (p->subtype >= ESP_PARTITION_SUBTYPE_APP_OTA_0 &&
+                            p->subtype <= ESP_PARTITION_SUBTYPE_APP_OTA_15);
+        if (is_factory || is_ota_slot) {
             cJSON *s = cJSON_CreateObject();
             cJSON_AddStringToObject(s, "label", p->label);
+            cJSON_AddStringToObject(s, "kind", is_factory ? "factory" : "ota");
             cJSON_AddNumberToObject(s, "size", (double)p->size);
             esp_app_desc_t pdesc;
             if (esp_ota_get_partition_description(p, &pdesc) == ESP_OK) {
@@ -668,16 +672,21 @@ esp_err_t diag_get(httpd_req_t *req)
             } else {
                 cJSON_AddStringToObject(s, "version", "");
             }
-            esp_ota_img_states_t st;
-            if (esp_ota_get_state_partition(p, &st) == ESP_OK) {
-                const char *st_str =
-                    st == ESP_OTA_IMG_NEW            ? "new" :
-                    st == ESP_OTA_IMG_PENDING_VERIFY ? "pending_verify" :
-                    st == ESP_OTA_IMG_VALID          ? "valid" :
-                    st == ESP_OTA_IMG_INVALID        ? "invalid" :
-                    st == ESP_OTA_IMG_ABORTED        ? "aborted" :
-                    st == ESP_OTA_IMG_UNDEFINED      ? "undefined" : "?";
-                cJSON_AddStringToObject(s, "state", st_str);
+            if (is_ota_slot) {
+                // Factory has no otadata state — it's always implicitly valid.
+                esp_ota_img_states_t st;
+                if (esp_ota_get_state_partition(p, &st) == ESP_OK) {
+                    const char *st_str =
+                        st == ESP_OTA_IMG_NEW            ? "new" :
+                        st == ESP_OTA_IMG_PENDING_VERIFY ? "pending_verify" :
+                        st == ESP_OTA_IMG_VALID          ? "valid" :
+                        st == ESP_OTA_IMG_INVALID        ? "invalid" :
+                        st == ESP_OTA_IMG_ABORTED        ? "aborted" :
+                        st == ESP_OTA_IMG_UNDEFINED      ? "undefined" : "?";
+                    cJSON_AddStringToObject(s, "state", st_str);
+                }
+            } else {
+                cJSON_AddStringToObject(s, "state", "immutable");
             }
             cJSON_AddBoolToObject(s, "running", running && p == running);
             cJSON_AddBoolToObject(s, "next",    next    && p == next);
