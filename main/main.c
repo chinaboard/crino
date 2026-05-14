@@ -282,18 +282,23 @@ void app_main(void)
     // it'll keep retrying.
     cr_time_sntp_start();
 
-    // App takes over. Apps that register HTTP routes use the
-    // cr_app_register_routes() hook in cr_http.c (called inside cr_http_start);
-    // anything else (BLE init, sensor tasks, custom timers) goes here.
-    cr_app_init();
-
-    // Now that everything's wired, schedule OTA validation. If anything
-    // panics in the next 60s the bootloader will revert to previous image.
+    // Schedule the chassis safety nets BEFORE handing off to the app.
+    // The OTA validate timer and heap watchdog are what catch a bad app —
+    // if cr_app_init() hangs or runs past 60s without yielding, the
+    // bootloader rollback path won't engage unless these timers are
+    // already armed. Same reasoning for the BOOT-button rescue task.
     schedule_ota_validation();
     schedule_heap_watchdog();
 #if CR_BOOT_BUTTON_GPIO >= 0
     xTaskCreate(boot_button_task, "boot_btn", 3072, NULL, 5, NULL);
 #endif
+
+    // App takes over. Apps that register HTTP routes use the
+    // cr_app_register_routes() hook in cr_http.c (called inside cr_http_start);
+    // anything else (BLE init, sensor tasks, custom timers) goes here.
+    // Anything slow / blocking the app does here happens UNDER the safety
+    // nets above.
+    cr_app_init();
 
     char ip[16];
     int tick = 0;
