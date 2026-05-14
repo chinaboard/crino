@@ -7,3 +7,5 @@ LED_ENABLE=1
 LED_KIND=1
 LED_GPIO=8
 LED_BRIGHTNESS=10
+# BOOT button — GPIO9 on the SuperMini reference design (active-low).
+BOOT_BUTTON_GPIO=9

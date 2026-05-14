@@ -51,7 +51,8 @@ EXTRA_CFLAGS := -DCR_TZ=\"$(TZ)\" \
                 -DCR_LED_ENABLE=$(LED_ENABLE) \
                 -DCR_LED_KIND=$(LED_KIND) \
                 -DCR_LED_GPIO=$(LED_GPIO) \
-                -DCR_LED_BRIGHTNESS=$(LED_BRIGHTNESS)
+                -DCR_LED_BRIGHTNESS=$(LED_BRIGHTNESS) \
+                -DCR_BOOT_BUTTON_GPIO=$(BOOT_BUTTON_GPIO)
 
 # Debug-only WiFi cred override: skip the SoftAP setup wizard and boot a
 # blank board straight into STA mode using these creds. Never set in CI.
@@ -64,14 +65,23 @@ EXTRA_CFLAGS += -DDEBUG_WIFI_PASS=\"$(DEBUG_WIFI_PASS)\"
 endif
 
 DOCKER_RUN = docker run --rm -v $(PWD):/project -w /project \
-             -e IDF_TARGET=$(IDF_TARGET) -e EXTRA_CFLAGS="$(EXTRA_CFLAGS)" $(IDF_IMAGE)
+             -e IDF_TARGET=$(IDF_TARGET) -e EXTRA_CFLAGS="$(EXTRA_CFLAGS)" \
+             -e EXTRA_COMPONENT_DIRS="$(EXTRA_COMPONENT_DIRS)" $(IDF_IMAGE)
 DOCKER_TTY = docker run --rm -it -v $(PWD):/project -w /project \
-             -e IDF_TARGET=$(IDF_TARGET) -e EXTRA_CFLAGS="$(EXTRA_CFLAGS)" $(IDF_IMAGE)
+             -e IDF_TARGET=$(IDF_TARGET) -e EXTRA_CFLAGS="$(EXTRA_CFLAGS)" \
+             -e EXTRA_COMPONENT_DIRS="$(EXTRA_COMPONENT_DIRS)" $(IDF_IMAGE)
+
+# EXTRA_COMPONENT_DIRS lets downstream apps live next to the chassis
+# without polluting components/. Pass it through to cmake explicitly —
+# the env var alone gets cached across `reconfigure` runs.
+ifneq ($(EXTRA_COMPONENT_DIRS),)
+EXTRA_CMAKE := -DEXTRA_COMPONENT_DIRS=$(EXTRA_COMPONENT_DIRS)
+endif
 
 .PHONY: build flash monitor flash-monitor erase clean fullclean menuconfig size shell
 
 build:
-	$(DOCKER_RUN) idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(SDKCONFIG) reconfigure build
+	$(DOCKER_RUN) idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(SDKCONFIG) $(EXTRA_CMAKE) reconfigure build
 
 flash:
 	espflash flash \

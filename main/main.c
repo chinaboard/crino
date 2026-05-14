@@ -88,16 +88,20 @@ static void schedule_heap_watchdog(void)
     }
 }
 
-// Physical recovery: long-press BOOT button (GPIO9 on most ESP32-C3/C6 dev
-// boards, active-low) for 5 seconds → factory reset + restart. Useful when
-// admin password is forgotten or device is wedged.
-#define BOOT_BUTTON_GPIO 9
+// Physical recovery: long-press BOOT button (active-low) for 5 seconds →
+// factory reset + restart. Useful when the admin password is forgotten or
+// the device is wedged. GPIO comes from the board preset via
+// boards/<board>.mk → CR_BOOT_BUTTON_GPIO=<N>. A value of -1 disables the
+// task entirely (e.g. boards without a button, headless installations).
+#ifndef CR_BOOT_BUTTON_GPIO
+#define CR_BOOT_BUTTON_GPIO 9
+#endif
 #define LONG_PRESS_MS    5000
 
 static void boot_button_task(void *arg)
 {
     gpio_config_t cfg = {
-        .pin_bit_mask = 1ULL << BOOT_BUTTON_GPIO,
+        .pin_bit_mask = 1ULL << CR_BOOT_BUTTON_GPIO,
         .mode         = GPIO_MODE_INPUT,
         .pull_up_en   = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -108,7 +112,7 @@ static void boot_button_task(void *arg)
     int64_t press_start_us = 0;
     int     last_log_sec = 0;
     while (1) {
-        int level = gpio_get_level(BOOT_BUTTON_GPIO);
+        int level = gpio_get_level(CR_BOOT_BUTTON_GPIO);
         if (level == 0) {
             // pressed (active-low)
             if (press_start_us == 0) {
@@ -227,7 +231,9 @@ void app_main(void)
     // panics in the next 60s the bootloader will revert to previous image.
     schedule_ota_validation();
     schedule_heap_watchdog();
+#if CR_BOOT_BUTTON_GPIO >= 0
     xTaskCreate(boot_button_task, "boot_btn", 3072, NULL, 5, NULL);
+#endif
 
     char ip[16];
     int tick = 0;
