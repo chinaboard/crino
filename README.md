@@ -14,11 +14,35 @@ Chassis boots cleanly on ESP32-C3 / ESP32-C6:
 - HTTP server on :80 with auth, OTA upload, system status, log viewer
 - Status LED (WS2812 RGB or plain GPIO LED via PWM)
 - Long-press BOOT button (5s) → factory reset
+- **Boot-loop recovery**: 3 consecutive bad boots → forced SoftAP
+  (see [Unbrickable recovery](#unbrickable-recovery) below)
 - Web UI: Overview tab (device resources) + System tab (LED / device name /
   NTP / OTA / backup / logs / restart / factory reset)
 
-Bare image is ~905 KB (about 60% of the 1.5 MB OTA slot), leaving ~620 KB
+Bare image is ~927 KB (about 60% of the 1.5 MB OTA slot), leaving ~620 KB
 of headroom for app code + ~131 KB free heap on ESP32-C3.
+
+## Unbrickable recovery
+
+Two layered safety nets keep the device recoverable from any state without
+USB access:
+
+**Layer 1 — OTA rollback** (built into ESP-IDF, used by crino):
+After an OTA update the bootloader marks the new image as "pending verify".
+If the new image panics within 60 seconds, the bootloader auto-reverts to
+the previous image at the next boot.
+
+**Layer 2 — Boot-loop recovery** (chassis):
+Persistent NVS counter `boot_loop` is bumped at every `app_main` entry and
+cleared by the same 60s timer that validates the OTA image. If three
+consecutive boots bump the counter without ever reaching the 60s healthy
+mark — anything from a panic loop after rollback to a watchdog hang to a
+brownout cycle — the chassis forces SoftAP recovery mode regardless of
+saved WiFi creds. The recovery SSID is `crino-rec-XXXX` (vs the normal
+`crino-setup-XXXX`) so a phone scan immediately shows the device is in
+trouble. The Web UI prints a red banner on every page; recovery is just
+"upload a working .bin via System → Firmware OTA". Threshold is in
+`CR_BOOT_LOOP_RECOVERY_THRESHOLD` (default 3).
 
 ## Build
 
