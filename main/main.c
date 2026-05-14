@@ -144,11 +144,11 @@ static void dump_chip(void)
     esp_chip_info_t info;
     esp_chip_info(&info);
     uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_BT);
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
     ESP_LOGI(TAG, " chip=%s rev=%d.%d cores=%d",
              cr_chip_model_str(info.model),
              info.revision / 100, info.revision % 100, info.cores);
-    ESP_LOGI(TAG, " BT MAC=%02x:%02x:%02x:%02x:%02x:%02x",
+    ESP_LOGI(TAG, " MAC=%02x:%02x:%02x:%02x:%02x:%02x",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 

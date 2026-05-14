@@ -27,8 +27,13 @@ BOARD      ?= supermini-c6
 # values (which Make sets before this include runs) win.
 include boards/$(BOARD).mk
 
-IDF_TARGET := esp32$(TARGET)
-BUILD_DIR  := build-$(IDF_TARGET)
+# Allow TARGET to be either short form (`c3`, `c6`) or the canonical
+# IDF identifier (`esp32c3`, `esp32c6`). Strip the leading "esp32"
+# if present, then prefix it once — avoids the `esp32esp32c3` build
+# dir if someone follows IDF convention and sets `TARGET=esp32c3`.
+TARGET_BARE := $(patsubst esp32%,%,$(TARGET))
+IDF_TARGET  := esp32$(TARGET_BARE)
+BUILD_DIR   := build-$(IDF_TARGET)
 # Per-target sdkconfig (the generated one with all expanded settings).
 # Defaults overlay still comes from sdkconfig.defaults + sdkconfig.defaults.$(IDF_TARGET).
 SDKCONFIG  := sdkconfig.$(IDF_TARGET)

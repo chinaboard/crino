@@ -40,9 +40,8 @@ static bool s_mdns_started = false;
 
 // Bring up mDNS so the device is reachable via http://crino-XXXX.local
 // from any modern OS, no router-DHCP-table hunting needed. Idempotent —
-// safe across STA reconnects. Hostname is BT-MAC-derived (matches the BLE
-// name + SoftAP SSID suffix) so it stays stable across BLE display-name
-// renames; bookmarks survive.
+// safe across STA reconnects. Hostname derives from the WiFi STA MAC so
+// it's stable across the device's lifetime.
 static void mdns_bring_up(void)
 {
     if (s_mdns_started) return;
@@ -51,7 +50,7 @@ static void mdns_bring_up(void)
         return;
     }
     uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_BT);
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char host[24];
     snprintf(host, sizeof(host), "crino-%02x%02x", mac[4], mac[5]);
     mdns_hostname_set(host);
@@ -162,11 +161,10 @@ static esp_err_t start_softap(void)
     s_netif_sta = esp_netif_create_default_wifi_sta();
 
     // Build per-device SSID `crino-setup-XXXX` (or `crino-rec-XXXX` in
-    // recovery mode) from the BT MAC last 2 bytes. Using BT MAC (not WiFi
-    // MAC) so the suffix matches the mDNS hostname `crino-XXXX` — one
-    // identifier per physical device.
+    // recovery mode) from the WiFi STA MAC last 2 bytes — one identifier
+    // per physical device, stable across the device's lifetime.
     uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_BT);
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char ssid[AP_SSID_MAX];
     const char *prefix = cr_metrics_in_recovery_mode()
         ? "crino-rec-"   // boot-loop recovery — visible at a glance

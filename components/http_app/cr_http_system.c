@@ -141,10 +141,10 @@ esp_err_t status_get(httpd_req_t *req)
     cJSON_AddNumberToObject(j, "chip_temp_c", chip_temp_c());
 
     // mDNS hostname so the UI (and the setup-saved screen) can show users
-    // a stable URL for after-reboot access. BT-MAC-derived; doesn't track
-    // the user-changeable display name.
+    // a stable URL for after-reboot access. WiFi-MAC-derived; doesn't
+    // track the user-changeable display name.
     {
-        uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_BT);
+        uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA);
         char host[24];
         snprintf(host, sizeof(host), "crino-%02x%02x", mac[4], mac[5]);
         cJSON_AddStringToObject(j, "mdns_host", host);
@@ -432,10 +432,11 @@ esp_err_t logs_clear_post(httpd_req_t *req)
 
 // ---------- backup / restore ----------
 //
-// Backup contains everything needed to recreate the device's logical state on
-// a fresh install: wifi creds, admin pw hash+salt, workers list. BLE bond
-// keys (LTK/IRK) are NOT included — they're per-device secrets that require
-// re-pairing on the new hardware.
+// Backup contains everything needed to recreate the chassis's logical state
+// on a fresh install: wifi creds + admin pw hash+salt. App-side data (NVS
+// namespaces other than the chassis "crino" one, app-managed files under
+// /storage, BLE bond keys, etc.) is the app's responsibility — extend
+// /api/system/backup via a custom route if needed.
 //
 // Restore is permitted ONLY when no admin is set (i.e. fresh install or after
 // factory reset), so it can't be abused to overwrite an active config.
@@ -482,7 +483,7 @@ esp_err_t backup_get(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "version", 1);
     cJSON_AddNumberToObject(root, "created_at", (double)time(NULL));
 
-    uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_BT);
+    uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char mac_str[18];
     snprintf(mac_str, sizeof(mac_str),
              "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -606,7 +607,7 @@ esp_err_t diag_get(httpd_req_t *req)
         esp_read_mac(mac, ESP_MAC_WIFI_STA);
         cr_format_mac(mac, buf);
         cJSON_AddStringToObject(chip, "mac_wifi", buf);
-        esp_read_mac(mac, ESP_MAC_BT);
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
         cr_format_mac(mac, buf);
         cJSON_AddStringToObject(chip, "mac_bt", buf);
         char host[24];
@@ -775,11 +776,35 @@ esp_err_t ota_post(httpd_req_t *req)
 
 // ---------- first-run setup + WiFi scan ----------
 
+// /api/setup handles two cases:
+//
+//   1. First run (no admin yet): require admin_password + accept optional
+//      wifi_ssid / wifi_password. Setup goes to NORMAL mode if WiFi
+//      provided, NO_WIFI otherwise.
+//
+//   2. Admin exists but device is in NO_WIFI mode (admin set, no WiFi
+//      creds — typically the user's WiFi password changed, or they
+//      moved the device): accept wifi_ssid + wifi_password without
+//      admin_password. This is the recovery path that lets a user
+//      reconfigure WiFi from the SoftAP without losing their admin
+//      password. Recovery is identified by checking `recovery_mode`
+//      via cr_metrics_in_recovery_mode() OR by simple no-wifi-creds
+//      check — either way, the device is offering SoftAP and the
+//      user is trying to reconnect it.
+//
+// Once admin exists AND wifi creds exist, /api/setup is locked out —
+// callers should use the authenticated endpoints from the System tab.
 esp_err_t setup_post(httpd_req_t *req)
 {
-    if (cr_config_has_admin()) {
+    const bool has_admin = cr_config_has_admin();
+    const bool has_wifi  = cr_config_has_wifi();
+
+    // Case 3: fully configured and not in recovery → reject. The
+    // authenticated endpoints from the System tab handle re-config.
+    if (has_admin && has_wifi && !cr_metrics_in_recovery_mode()) {
         return reply_text(req, "409 Conflict", "already configured");
     }
+
     cJSON *j = recv_json_body(req);
     if (!j) return reply_text(req, "400 Bad Request", "bad json");
 
@@ -787,20 +812,53 @@ esp_err_t setup_post(httpd_req_t *req)
     const cJSON *ssid = cJSON_GetObjectItem(j, "wifi_ssid");
     const cJSON *pass = cJSON_GetObjectItem(j, "wifi_password");
 
-    if (!cJSON_IsString(adm) || strlen(adm->valuestring) < 8) {
+    // Decide whether this request will set admin. First-run REQUIRES it;
+    // wifi-only update FORBIDS it (don't let an unauthenticated client
+    // change an existing admin password via /api/setup).
+    const bool setting_admin = !has_admin;
+    if (setting_admin) {
+        if (!cJSON_IsString(adm) || strlen(adm->valuestring) < 8) {
+            cJSON_Delete(j);
+            return reply_text(req, "400 Bad Request", "admin_password >= 8 chars");
+        }
+    } else if (cJSON_IsString(adm) && adm->valuestring[0] != '\0') {
+        // Refuse to touch an existing admin password from an unauth
+        // setup call. The Web UI's recovery wizard knows not to send
+        // admin_password in this case; this guards a hand-crafted POST.
         cJSON_Delete(j);
-        return reply_text(req, "400 Bad Request", "admin_password >= 8 chars");
+        return reply_text(req, "403 Forbidden",
+            "admin already set; use /api/auth/change_password");
     }
 
-    esp_err_t err = cr_config_set_admin_password(adm->valuestring);
-    if (err != ESP_OK) {
+    const bool setting_wifi = cJSON_IsString(ssid) && ssid->valuestring[0] != '\0';
+    if (!setting_admin && !setting_wifi) {
         cJSON_Delete(j);
-        return reply_text(req, "500 Internal Server Error", "set admin failed");
+        return reply_text(req, "400 Bad Request",
+            "wifi_ssid required for wifi-only setup");
     }
 
-    if (cJSON_IsString(ssid) && strlen(ssid->valuestring) > 0) {
+    // Validate everything before persisting either field, so a partial
+    // write can't strand the device. (We don't validate WiFi connectivity
+    // here — only string presence/length — full STA validation happens
+    // after reboot.)
+    if (setting_wifi && strlen(ssid->valuestring) >= CR_WIFI_SSID_MAX) {
+        cJSON_Delete(j);
+        return reply_text(req, "400 Bad Request", "wifi_ssid too long");
+    }
+
+    // Persist in dependency order: admin first (NVS), then wifi. If WiFi
+    // save fails we keep the admin password — caller can retry the wifi
+    // save without re-sending admin (we'd hit the wifi-only path next time).
+    if (setting_admin) {
+        esp_err_t err = cr_config_set_admin_password(adm->valuestring);
+        if (err != ESP_OK) {
+            cJSON_Delete(j);
+            return reply_text(req, "500 Internal Server Error", "set admin failed");
+        }
+    }
+    if (setting_wifi) {
         const char *pwstr = cJSON_IsString(pass) ? pass->valuestring : "";
-        err = cr_config_set_wifi(ssid->valuestring, pwstr);
+        esp_err_t err = cr_config_set_wifi(ssid->valuestring, pwstr);
         if (err != ESP_OK) {
             cJSON_Delete(j);
             return reply_text(req, "500 Internal Server Error", "set wifi failed");

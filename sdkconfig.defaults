@@ -14,31 +14,12 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 
-# --- Bluetooth (NimBLE host) ---
-CONFIG_BT_ENABLED=y
-CONFIG_BT_NIMBLE_ENABLED=y
-# 8 concurrent connections — we hold a persistent connection to each
-# in-range bonded peer (BLE-geofence model). With BOND_MAX_LIST=8 this
-# matches the upper bound. ~1 KB RAM per connection slot.
-CONFIG_BT_NIMBLE_MAX_CONNECTIONS=8
-
-# Extended advertising: 2 instances (HID + BTHome time broadcaster).
-# HID instance uses legacy_pdu for iPhone backward-compat.
-CONFIG_BT_NIMBLE_EXT_ADV=y
-CONFIG_BT_NIMBLE_MAX_EXT_ADV_INSTANCES=2
-
-# HID service (impersonate BLE keyboard so iPhone bonds and auto-reconnects)
-CONFIG_BT_NIMBLE_HID_SERVICE=y
-CONFIG_BT_NIMBLE_SVC_HID_MAX_RPTS=4
-
-# Security manager: LE Secure Connections + bonding + Display-only IO cap
-# so we can drive Passkey Entry from the Web UI.
-CONFIG_BT_NIMBLE_SM_SC=y
-CONFIG_BT_NIMBLE_SM_LEGACY=n
-CONFIG_BT_NIMBLE_NVS_PERSIST=y
-
-# Whitelist large enough to hold all bonded workers
-CONFIG_BT_NIMBLE_WHITELIST_SIZE=16
+# --- Bluetooth ---
+# Disabled in the chassis default. Apps that need BLE add their own overlay
+# (e.g. sdkconfig.app.bt) or override via menuconfig. Keeping it off here
+# saves ~200 KB binary + ~30 KB heap that pure WiFi-only firmware doesn't
+# need.
+CONFIG_BT_ENABLED=n
 
 # --- WiFi ---
 CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=y
@@ -55,7 +36,7 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 # esp_ota_mark_app_valid_cancel_rollback() before reboot.
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
-# --- Console over USB Serial/JTAG (ESP32-C6 native USB) ---
+# --- Console over USB Serial/JTAG (ESP32-C6 / C3 native USB) ---
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
 # --- Size optimization ---
@@ -69,14 +50,6 @@ CONFIG_NEWLIB_NANO_FORMAT=y
 
 # Bring assertions to ENABLE (was 2 = SILENT — already was, but make explicit)
 CONFIG_COMPILER_OPTIMIZATION_ASSERTION_LEVEL=2
-
-# --- BLE: roles ---
-# Peripheral (HID), Broadcaster (BTHome), AND Observer (continuous scan for
-# bonded iPhones to detect presence via RPA resolution against stored IRK).
-# Observer is the core attendance signal — without it we'd be relying on iOS
-# to reconnect after iPhone wakes, which is unreliable and slow.
-CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
-CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
 
 # --- mbedTLS: keep only SHA-256 (PBKDF2 needs it). Drop SHA-1/384/512. ---
 CONFIG_MBEDTLS_SHA1_C=n
