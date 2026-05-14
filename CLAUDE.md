@@ -6,9 +6,7 @@ Guidance for Claude Code working in this repo.
 
 ESP32-C3 / ESP32-C6 firmware **chassis** — the WiFi + OTA + Web-UI base
 that any device-firmware project would otherwise have to write from
-scratch. Lifted out of the dingdong-fw attendance project at
-`~/workspace/dingdong-fw`, then stripped of all app-specific bits
-(BLE / events / workers / attendance UI) and renamed `dd_*` → `cr_*`.
+scratch.
 
 Crino is **not** a finished firmware on its own — it boots, serves the
 chassis Web UI, and waits. Apps extend it through three weak symbols
@@ -27,8 +25,6 @@ bare crino build (no app) flashes and runs as the chassis-only
 firmware described in README.md.
 
 ## Build / flash
-
-Same Makefile pattern as dingdong-fw:
 
 ```bash
 make build BOARD=supermini-c3

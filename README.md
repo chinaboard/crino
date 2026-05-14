@@ -123,4 +123,4 @@ boards/           per-board overrides (TARGET, LED_KIND, GPIO, etc.)
 
 ## License
 
-Same as dingdong-fw (MIT).
+MIT.

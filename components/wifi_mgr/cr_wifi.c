@@ -66,7 +66,19 @@ static void sta_giveup_cb(void *arg)
     if (s_sta_down_since_us == 0) return;
     int64_t down_ms = (esp_timer_get_time() - s_sta_down_since_us) / 1000;
     if (down_ms >= STA_GIVE_UP_MS) {
-        ESP_LOGE(TAG, "STA down for %lld ms, restarting device", (long long)down_ms);
+        // Force boot-loop recovery on the next restart so the user lands
+        // on SoftAP and can fix the WiFi creds (wrong password, AP moved,
+        // SSID changed, etc.). Without this we'd just esp_restart and
+        // try the same bad creds again — a slow death spiral that takes
+        // 30 minutes (3 × 10 min) before the existing boot-loop counter
+        // catches up.
+        for (uint32_t i = cr_metrics_boot_loop_count();
+             i < CR_BOOT_LOOP_RECOVERY_THRESHOLD; i++) {
+            cr_metrics_boot_loop_inc();
+        }
+        cr_metrics_set_restart_cause(CR_RESTART_BOOT_LOOP);
+        ESP_LOGE(TAG, "STA down for %lld ms — forcing SoftAP recovery on next boot",
+                 (long long)down_ms);
         esp_restart();
     }
 }
