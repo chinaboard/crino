@@ -1,0 +1,91 @@
+name: build
+
+# Branch / PR pushes always build and upload a workflow artifact (90-day
+# retention) so reviewers can download a flashable .bin without rebuilding
+# locally. Tag pushes matching v* also create a GitHub Release with the same
+# assets attached.
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+# Cancel superseded runs on the same ref to keep the queue snappy. Tag runs
+# never get cancelled (they may be the only path to a release artifact).
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed only for the release job (tag pushes)
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [supermini-c6, supermini-c3]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # fetch-depth: 0 so `git describe` inside CMake can see all tags;
+      # default shallow clone hides them.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Mirror what CMake's `git describe` will produce, so we can name
+      # artifacts consistently.
+      - id: version
+        run: |
+          VER=$(git describe --tags --dirty --always | sed 's/^v//')
+          echo "FULL_VER=$VER" >> "$GITHUB_ENV"
+          echo "version=$VER"   >> "$GITHUB_OUTPUT"
+          echo "Building $VER for ${{ matrix.board }}"
+
+      # Just call the same Makefile developers use locally — it handles
+      # board-overlay include, EXTRA_CFLAGS construction, docker invocation,
+      # and per-target build dir. CI doesn't need to know any of those bits;
+      # if you can build it on your laptop with `make build BOARD=X`, CI
+      # builds it the same way.
+      - name: Build firmware
+        run: make build BOARD=${{ matrix.board }}
+
+      # BOARD name suffix is the chip target (e.g. supermini-c6 → c6 → esp32c6),
+      # which is also the build dir name. Single source of truth, no manual
+      # config plumbing needed.
+      - name: Stage release assets
+        run: |
+          BOARD=${{ matrix.board }}
+          IDF_TARGET=esp32${BOARD##*-}              # supermini-c6 → esp32c6
+          BD=build-$IDF_TARGET
+          mkdir -p release
+          cp $BD/crino.bin                          "release/crino-${BOARD}-${FULL_VER}.bin"
+          cp $BD/bootloader/bootloader.bin             "release/bootloader-${BOARD}.bin"
+          cp $BD/partition_table/partition-table.bin   "release/partition-table-${BOARD}.bin"
+          cp $BD/ota_data_initial.bin                  "release/ota_data_initial-${BOARD}.bin"
+          docker run --rm -v "$PWD:/project" -w /project \
+            espressif/idf:v6.0.1 \
+            python -m esptool --chip $IDF_TARGET merge-bin -o "release/crino-merged-${BOARD}-${FULL_VER}.bin" \
+              0x0      $BD/bootloader/bootloader.bin \
+              0x8000   $BD/partition_table/partition-table.bin \
+              0x10000  $BD/ota_data_initial.bin \
+              0x20000  $BD/crino.bin
+          ls -lh release/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board }}-${{ env.FULL_VER }}
+          path: release/
+          retention-days: 90
+
+      # Release only fires on tag pushes (v*). Auto-generated notes use
+      # commit subjects between this tag and the previous one. Both matrix
+      # jobs upload to the same release — softprops merges asset lists.
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

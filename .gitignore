@@ -1,0 +1,12 @@
+build/
+build-*/
+sdkconfig
+sdkconfig.old
+sdkconfig.esp32*
+managed_components/
+dependencies.lock
+
+.vscode/
+.idea/
+.DS_Store
+.claude/
