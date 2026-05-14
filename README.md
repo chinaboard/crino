@@ -5,7 +5,7 @@ Apps fork or extend this with their own components and HTTP routes.
 
 ## Status
 
-WIP. Chassis boots cleanly on ESP32-C3 / ESP32-C6:
+Chassis boots cleanly on ESP32-C3 / ESP32-C6:
 
 - SoftAP first-run wizard with captive-portal DNS hijack
 - Admin password + WiFi creds set via Web UI
@@ -14,8 +14,11 @@ WIP. Chassis boots cleanly on ESP32-C3 / ESP32-C6:
 - HTTP server on :80 with auth, OTA upload, system status, log viewer
 - Status LED (WS2812 RGB or plain GPIO LED via PWM)
 - Long-press BOOT button (5s) → factory reset
+- Web UI: Overview tab (device resources) + System tab (LED / device name /
+  NTP / OTA / backup / logs / restart / factory reset)
 
-Web UI is currently the un-pruned dingdong-fw UI minus the chassis tabs (still WIP).
+Bare image is ~905 KB (about 60% of the 1.5 MB OTA slot), leaving ~620 KB
+of headroom for app code + ~131 KB free heap on ESP32-C3.
 
 ## Build
 
@@ -29,12 +32,27 @@ make monitor
 Build runs inside `espressif/idf:v6.0.1` Docker; flash/monitor run on the host
 with `espflash` (`brew install espflash`).
 
+### Skipping the SoftAP wizard for development
+
+Bake WiFi creds straight into the binary so a fresh-flashed board boots
+straight into STA mode (no admin / no SoftAP wizard):
+
+```bash
+make build BOARD=supermini-c3 \
+    DEBUG_WIFI_SSID=MyHomeWiFi DEBUG_WIFI_PASS='myhomepass'
+```
+
+`cr_config_get_wifi()` and `cr_config_boot_mode()` honor the macros, so the
+device skips the FIRST_RUN wizard. **Never set these in CI** — the password
+goes straight into the .bin. Use only for your own dev boards.
+
 ## Extending crino — app hooks
 
-Two weak symbols in the chassis let an app extend without forking:
+Three weak symbols in the chassis let an app extend without forking:
 
 ```c
 #include "cr_http.h"
+#include "cr_led.h"
 
 // 1. Register your HTTP routes here. Called once near the end of cr_http_start
 //    after all chassis routes are installed.
@@ -48,11 +66,18 @@ void cr_app_register_routes(httpd_handle_t server) {
 void cr_app_init(void) {
     my_subsystem_start();
 }
+
+// 3. (Optional) Tell the chassis LED to show the BUSY state (cyan fast-blink
+//    on RGB / DUTY_BLINK on PWM) for transient foreground operations:
+//    pairing windows, OTA upload progress, sensor calibration, etc.
+bool cr_app_led_busy(void) {
+    return my_op_in_progress;
+}
 ```
 
 Drop your `.c`/`.h` into `components/<your_app>/` (or anywhere under
-`components/`) — IDF auto-discovers. Add the two functions above to make
-your app boot.
+`components/`) — IDF auto-discovers. Define one or more of the hooks above
+and your app boots on top of the chassis.
 
 ## Repo layout
 

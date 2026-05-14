@@ -321,14 +321,13 @@ const $=id=>document.getElementById(id);
 // Placeholders use {0} {1} … positional, replaced by t(key, ...args).
 const I18N = {
   en: {
-    'nav.overview':'Overview', 'nav.attendance':'Attendance', 'nav.people':'People', 'nav.system':'System',
+    'nav.overview':'Overview', 'nav.system':'System',
     'health.healthy':'Healthy',
-    'issue.ble':'BLE', 'issue.wifi':'WiFi', 'issue.ntp':'NTP', 'issue.no_wifi':'No WiFi',
+    'issue.wifi':'WiFi', 'issue.ntp':'NTP', 'issue.no_wifi':'No WiFi',
     'common.loading':'loading…', 'common.failed':'Failed', 'common.failed_prefix':'Failed: ',
     'common.save':'Save', 'common.refresh':'Refresh', 'common.cancel':'Cancel', 'common.ok':'OK',
     'common.load_failed':'(load failed)',
     'rel.s':'{0}s ago', 'rel.m':'{0}m ago', 'rel.h':'{0}h ago', 'rel.d':'{0}d ago',
-    'cal.weekdays':'Sun,Mon,Tue,Wed,Thu,Fri,Sat',
 
     'setup.title':'Initial setup',
     'setup.desc':'Set the admin password and WiFi credentials. The device will reboot into normal mode.',
@@ -355,69 +354,12 @@ const I18N = {
     'wizard.device_label':'Configuring device',
 
     'overview.title':'Overview',
-    'overview.desc':"Device status and today's attendance.",
-    'overview.stat_on_site':'On site', 'overview.unit_people':'people',
-    'overview.active_workers':'{0} active workers',
-    'overview.stat_active':'Active today', 'overview.unit_sessions':'sessions',
-    'overview.in_out_events':'{0} in/out events',
-    'overview.stat_bonded':'Bonded', 'overview.unit_iphone':'iPhone',
-    'overview.of_workers':'of {0} workers',
-    'overview.bond_cap':'cap {0}',
-    'overview.today_label':"Today's check-ins",
-    'overview.cal_label':'Last 30 days',
+    'overview.desc':'Device status and resources.',
     'overview.res_label':'Device resources',
-    'overview.no_today':'No check-ins today',
-    'overview.col_worker':'Worker', 'overview.col_sessions':'Sessions',
-    'overview.col_total':'Total', 'overview.col_status':'Status',
-    'overview.on_site':'On site', 'overview.left':'Left',
     'overview.disk':'Disk (LittleFS)',
-    'overview.events_file':'events.jsonl',
-    'overview.events_unit':'events',
     'overview.ram_free':'RAM free',
     'overview.uptime':'Uptime',
-    'overview.ble_name':'BLE name',
-    'overview.col_time':'Time', 'overview.col_type':'Type',
-    'overview.col_source':'Source',
-    'overview.no_events_day':'No events',
-
-    'attendance.title':'Attendance log',
-    'attendance.desc':'Raw event stream and paired sessions.',
-    'attendance.all_workers':'All workers',
-    'attendance.raw_view':'Raw view', 'attendance.sessions_view':'Sessions view',
-    'attendance.export_label':'Export',
-    'attendance.from':'From', 'attendance.to':'To',
-    'attendance.raw_csv':'Raw CSV', 'attendance.sessions_csv':'Sessions CSV', 'attendance.jsonl':'JSONL',
-    'attendance.wipe':'Wipe all events',
-    'attendance.wipe_hint':'Permanently deletes every recorded check-in / check-out. Cannot be undone.',
-    'attendance.wipe_confirm':'Wipe all events? This cannot be undone.',
-    'attendance.no_sessions':'No sessions',
-    'attendance.col_start':'Start', 'attendance.col_end':'End', 'attendance.col_duration':'Duration',
-    'attendance.no_events':'No events — IN fires when an iPhone enters range',
-    'attendance.col_note':'Note',
-    'attendance.delete_one':'Delete this event',
-    'attendance.delete_one_confirm':'Delete this single event?',
-
-    'people.title':'People / devices',
-    'people.desc':'Each worker is one iPhone. BLE pairing creates the entry; "Delete" removes the worker, its bond, and its history.',
-    'people.pairing_title':'BLE pairing',
-    'people.pairing_desc':'30s window. iPhone shows the same 6-digit code; verify and confirm.',
-    'people.start':'Start pairing',
-    'people.start_failed':'Failed to start pairing',
-    'people.window_closed':'Pairing window closed',
-    'people.numcmp_l1_html':'iPhone should show the <strong style="color:var(--t1)">same 6-digit number</strong>.',
-    'people.numcmp_l2_html':'If they match, tap <strong style="color:var(--t1)">Pair</strong> on the iPhone — bonding completes automatically.',
-    'people.tap_html':'Tap <span class=mono style="color:var(--accent)">{0}</span> on your iPhone',
-    'people.after_connect':'After connecting, both this page and the iPhone will show a matching 6-digit number',
-    'people.remaining':'{0}s remaining',
-    'people.cancel_pair':'Cancel pairing',
-    'people.workers_title':'Workers',
-    'people.no_workers':'No workers yet — first BLE pairing creates one',
-    'people.name_ph':'name', 'people.cat_ph':'category',
-    'people.in':'+IN', 'people.out':'+OUT',
-    'people.delete':'Delete',
-    'people.note_prompt':'Note (optional)',
-    'people.delete_confirm':'Permanently delete this worker? Their BLE bond and all attendance records will also be removed. This cannot be undone.',
-    'people.bonded':'bonded', 'people.not_bonded':'not bonded',
+    'overview.device_name':'Device name',
 
     'system.title':'System',
     'system.desc':'Diagnostics, device name, firmware update, backup, danger zone.',
@@ -433,15 +375,11 @@ const I18N = {
     'system.reset_stats_confirm':'Reset boot count + total uptime to zero?',
     'system.sync_ntp':'Sync NTP',
     'system.logout':'Log out',
-    'system.dev_name_label':'BLE device name',
-    'system.dev_name_note':"* Renaming doesn't update already-paired iPhones; \"Forget This Device\" + re-pair to refresh",
+    'system.dev_name_label':'Device name',
+    'system.dev_name_note':'* Display name surfaced in the UI. Apps may also surface it elsewhere (BLE adv name, sensor labels, etc.).',
     'system.led_label':'Status LED',
     'system.led_toggle':'Enable status LED',
-    'system.led_note':'* Turning off blanks the on-board pixel completely (heap warnings, pairing window, NTP state).',
-    'system.presence_label':'Presence OUT timeout',
-    'system.presence_unit':'seconds',
-    'system.presence_range':'Timeout must be between 30 and 600 seconds',
-    'system.presence_note':'* How long without any signal (BLE adv, connect probe, or HID reconnect) before declaring an iPhone gone. Range 30–600. Lower = quicker OUT detection but more false OUTs when iPhone is locked.',
+    'system.led_note':'* Turning off blanks the on-board pixel completely (heap warnings, busy state, NTP state).',
     'system.change_pw_label':'Change admin password',
     'system.cur_pw':'Current password', 'system.new_pw':'New password (≥8 chars)', 'system.change':'Change',
     'system.pw_required':'Current password + new password (≥8 chars) required',
@@ -459,7 +397,7 @@ const I18N = {
     'system.danger_label':'Danger zone',
     'system.restart':'Restart device', 'system.factory':'Factory reset',
     'system.restart_confirm':'Confirm restart?',
-    'system.factory_confirm':'Factory reset wipes: admin password, WiFi, workers, all BLE bonds, all events. Cannot be undone. Continue?',
+    'system.factory_confirm':'Factory reset wipes admin password and WiFi credentials. Cannot be undone. Continue?',
     'system.reboot_title':'Device restarting…',
     'system.reboot_waiting':'Waiting (30s+)',
     'system.reboot_timeout':'Timeout — please refresh manually',
@@ -473,9 +411,7 @@ const I18N = {
     'diag.ram':'RAM', 'diag.free':'free',
     'diag.min_free':'All-time min', 'diag.largest':'Largest block',
     'diag.disk':'Disk',
-    'diag.events_file':'events.jsonl',
     'diag.ota_slot':'OTA slots', 'diag.running':'running', 'diag.next_slot':'next',
-    'diag.retention':'Retain {0} days',
 
     'logs.title':'Recent logs',
     'logs.desc':'Tail of the in-RAM ring buffer that captures every ESP_LOGI/W/E. Same stream as `make monitor` over USB; useful when the device is remote.',
@@ -484,14 +420,13 @@ const I18N = {
     'logs.empty':'(no log lines yet)',
   },
   zh: {
-    'nav.overview':'总览', 'nav.attendance':'考勤', 'nav.people':'人员', 'nav.system':'系统',
+    'nav.overview':'总览', 'nav.system':'系统',
     'health.healthy':'运行正常',
-    'issue.ble':'蓝牙', 'issue.wifi':'WiFi', 'issue.ntp':'时间', 'issue.no_wifi':'未配置 WiFi',
+    'issue.wifi':'WiFi', 'issue.ntp':'时间', 'issue.no_wifi':'未配置 WiFi',
     'common.loading':'加载中…', 'common.failed':'失败', 'common.failed_prefix':'失败:',
     'common.save':'保存', 'common.refresh':'刷新', 'common.cancel':'取消', 'common.ok':'确定',
     'common.load_failed':'(加载失败)',
     'rel.s':'{0} 秒前', 'rel.m':'{0} 分钟前', 'rel.h':'{0} 小时前', 'rel.d':'{0} 天前',
-    'cal.weekdays':'日,一,二,三,四,五,六',
 
     'setup.title':'首次配置',
     'setup.desc':'设置管理员密码和 WiFi。完成后设备会重启进入正常模式。',
@@ -518,69 +453,12 @@ const I18N = {
     'wizard.device_label':'当前设备',
 
     'overview.title':'总览',
-    'overview.desc':'设备状态与今日考勤。',
-    'overview.stat_on_site':'在场', 'overview.unit_people':'人',
-    'overview.active_workers':'共 {0} 名员工活跃',
-    'overview.stat_active':'今日活跃', 'overview.unit_sessions':'次',
-    'overview.in_out_events':'{0} 条进/出记录',
-    'overview.stat_bonded':'已配对', 'overview.unit_iphone':'部',
-    'overview.of_workers':'/ 共 {0} 名员工',
-    'overview.bond_cap':'上限 {0}',
-    'overview.today_label':'今日打卡',
-    'overview.cal_label':'最近 30 天',
+    'overview.desc':'设备状态与资源。',
     'overview.res_label':'设备资源',
-    'overview.no_today':'今日还没有打卡',
-    'overview.col_worker':'员工', 'overview.col_sessions':'次数',
-    'overview.col_total':'总时长', 'overview.col_status':'状态',
-    'overview.on_site':'在场', 'overview.left':'已离开',
     'overview.disk':'磁盘 (LittleFS)',
-    'overview.events_file':'events.jsonl',
-    'overview.events_unit':'条',
     'overview.ram_free':'剩余内存',
     'overview.uptime':'运行时长',
-    'overview.ble_name':'BLE 名称',
-    'overview.col_time':'时间', 'overview.col_type':'类型',
-    'overview.col_source':'来源',
-    'overview.no_events_day':'当日无事件',
-
-    'attendance.title':'考勤日志',
-    'attendance.desc':'原始事件流与配对后的会话记录。',
-    'attendance.all_workers':'全部员工',
-    'attendance.raw_view':'原始视图', 'attendance.sessions_view':'会话视图',
-    'attendance.export_label':'导出',
-    'attendance.from':'起', 'attendance.to':'止',
-    'attendance.raw_csv':'原始 CSV', 'attendance.sessions_csv':'会话 CSV', 'attendance.jsonl':'JSONL',
-    'attendance.wipe':'清空所有事件',
-    'attendance.wipe_hint':'永久删除每一条进/出记录。不可撤销。',
-    'attendance.wipe_confirm':'确认清空所有事件?该操作不可撤销。',
-    'attendance.no_sessions':'暂无会话',
-    'attendance.col_start':'开始', 'attendance.col_end':'结束', 'attendance.col_duration':'时长',
-    'attendance.no_events':'暂无事件 — iPhone 进入识别范围时会自动生成 IN',
-    'attendance.col_note':'备注',
-    'attendance.delete_one':'删除该条',
-    'attendance.delete_one_confirm':'删除这一条事件?',
-
-    'people.title':'人员 / 设备',
-    'people.desc':'每个员工对应一部 iPhone。BLE 配对后会自动创建条目;"删除"会同时移除员工、配对绑定与全部历史记录。',
-    'people.pairing_title':'BLE 配对',
-    'people.pairing_desc':'窗口时长 30 秒。iPhone 会显示同样的 6 位数字,确认匹配后点击确认。',
-    'people.start':'开始配对',
-    'people.start_failed':'启动配对失败',
-    'people.window_closed':'配对窗口已关闭',
-    'people.numcmp_l1_html':'iPhone 应该显示<strong style="color:var(--t1)">相同的 6 位数字</strong>。',
-    'people.numcmp_l2_html':'如果数字一致,在 iPhone 上点击 <strong style="color:var(--t1)">配对</strong> — 设备这边会自动完成绑定。',
-    'people.tap_html':'请在 iPhone 上点击 <span class=mono style="color:var(--accent)">{0}</span>',
-    'people.after_connect':'连接后,本页和 iPhone 上会显示相同的 6 位数字',
-    'people.remaining':'剩余 {0} 秒',
-    'people.cancel_pair':'取消配对',
-    'people.workers_title':'员工',
-    'people.no_workers':'暂无员工 — 首次 BLE 配对会自动创建',
-    'people.name_ph':'姓名', 'people.cat_ph':'分组',
-    'people.in':'+上班', 'people.out':'+下班',
-    'people.delete':'删除',
-    'people.note_prompt':'备注 (可选)',
-    'people.delete_confirm':'确认永久删除该员工?其 BLE 配对与全部考勤记录会一并清除,操作不可撤销。',
-    'people.bonded':'已配对', 'people.not_bonded':'未配对',
+    'overview.device_name':'设备名',
 
     'system.title':'系统',
     'system.desc':'诊断信息、设备名、固件升级、备份与危险操作。',
@@ -596,15 +474,11 @@ const I18N = {
     'system.reset_stats_confirm':'把启动次数 + 累计运行时间清零?',
     'system.sync_ntp':'同步时间',
     'system.logout':'退出登录',
-    'system.dev_name_label':'BLE 设备名',
-    'system.dev_name_note':'* 改名不会影响已配对的 iPhone;请先在 iPhone 上"忽略此设备"再重新配对',
+    'system.dev_name_label':'设备名',
+    'system.dev_name_note':'* UI 上显示的设备名。下游 app 可以选择把它进一步用在 BLE 广播名、传感器标签等地方。',
     'system.led_label':'状态 LED',
     'system.led_toggle':'启用状态 LED',
-    'system.led_note':'* 关闭后板载像素灯完全熄灭(不会再显示堆告警、配对窗口、NTP 状态等)。',
-    'system.presence_label':'OUT 超时',
-    'system.presence_unit':'秒',
-    'system.presence_range':'超时值必须在 30 到 600 秒之间',
-    'system.presence_note':'* 多久没有任何信号(BLE 广播、连接探测、HID 自动回连)就判定 iPhone 离开。范围 30–600。值越小 OUT 越快,但 iPhone 锁屏期间误 OUT 几率越高。',
+    'system.led_note':'* 关闭后板载像素灯完全熄灭(不会再显示堆告警、busy 状态、NTP 状态等)。',
     'system.change_pw_label':'修改管理员密码',
     'system.cur_pw':'当前密码', 'system.new_pw':'新密码 (≥8 位)', 'system.change':'修改',
     'system.pw_required':'需要填写当前密码 + 新密码 (≥8 位)',
@@ -622,7 +496,7 @@ const I18N = {
     'system.danger_label':'危险操作',
     'system.restart':'重启设备', 'system.factory':'恢复出厂',
     'system.restart_confirm':'确认重启?',
-    'system.factory_confirm':'恢复出厂会清除:管理员密码、WiFi 配置、员工列表、全部 BLE 配对、全部事件。不可撤销,继续吗?',
+    'system.factory_confirm':'恢复出厂会清除管理员密码与 WiFi 配置。不可撤销,继续吗?',
     'system.reboot_title':'设备重启中…',
     'system.reboot_waiting':'等待中 (30 秒以上)',
     'system.reboot_timeout':'超时 — 请手动刷新页面',
@@ -636,9 +510,7 @@ const I18N = {
     'diag.ram':'内存', 'diag.free':'空闲',
     'diag.min_free':'历史最低', 'diag.largest':'最大可用块',
     'diag.disk':'磁盘',
-    'diag.events_file':'events.jsonl',
     'diag.ota_slot':'OTA 分区', 'diag.running':'运行中', 'diag.next_slot':'OTA 写这里',
-    'diag.retention':'保留 {0} 天',
 
     'logs.title':'最近日志',
     'logs.desc':'内存中环形缓冲区,捕获所有 ESP_LOGI/W/E 输出。和 USB `make monitor` 看到的是同一条流;远程调试时有用。',
@@ -667,11 +539,9 @@ function t(key, ...args){
 
 const NAV=[
   {id:'overview',k:'nav.overview'},
-  {id:'attendance',k:'nav.attendance'},
-  {id:'people',k:'nav.people'},
   {id:'system',k:'nav.system'},
 ];
-let state={view:'overview',workers:[],workersById:{},pairedMode:false,authed:false,setupMode:false,status:null,logsTimer:null,pairTimer:null};
+let state={view:'overview',authed:false,setupMode:false,status:null,logsTimer:null};
 
 function renderNav(host,active){
   host.innerHTML='';
@@ -719,7 +589,6 @@ async function refreshStatus(){
   if(r.now_unix){const d=new Date(r.now_unix*1000);
     $('clock').textContent=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;}
   const issues=[];
-  if(!r.ble_advertising)issues.push(t('issue.ble'));
   if(!(r.wifi==='AP'||r.wifi==='STA_GOT_IP'))issues.push(t('issue.wifi'));
   if(!r.ntp_synced&&r.wifi==='STA_GOT_IP')issues.push(t('issue.ntp'));
   if(r.has_admin&&!r.has_wifi_creds)issues.push(t('issue.no_wifi'));
@@ -767,7 +636,6 @@ function render(){
   $('topLogoutB').title = t('system.logout');
   // Tear down auto-refresh timers when navigating away from their tab.
   if(state.view!=='system' && state.logsTimer){clearInterval(state.logsTimer);state.logsTimer=null;}
-  if(state.view!=='people' && state.pairTimer){clearTimeout(state.pairTimer);state.pairTimer=null;}
   if (wizard) {
     // No nav in wizard mode — clear stale tab content if rendered earlier.
     $('sidebar').innerHTML = '';
@@ -777,16 +645,12 @@ function render(){
   }
   renderNav($('sidebar'),state.view);
   renderNav($('mobiletabs'),state.view);
-  if(state.view==='overview')renderOverview();
-  else if(state.view==='attendance')renderAttendance();
-  else if(state.view==='people')renderPeople();
-  else if(state.view==='system')renderSystem();
+  if(state.view==='system')renderSystem();
+  else renderOverview();
 }
 
 function wizardDeviceBadge(){
-  const ble = state.status?.ble;
-  const mdns = state.status?.mdns_host;
-  const id = ble || mdns || '?';
+  const id = state.status?.device_name || state.status?.mdns_host || '?';
   return `<div class='t-mute' style='font-size:11px;text-align:center;margin-bottom:18px;font-family:ui-monospace,Menlo,monospace'>
     ${t('wizard.device_label')}: <span style='color:var(--t1)'>${id}</span>
   </div>`;
@@ -902,13 +766,6 @@ function renderLogin(){
 async function renderOverview(){
   $('main').innerHTML=`
     <div class=ph><h1>${t('overview.title')}</h1><div class=desc>${t('overview.desc')}</div></div>
-    <div class=stats id=statsRow>
-      <div class=stat><div class=k>${t('overview.stat_on_site')}</div><div class=v>—</div><div class=sub>—</div></div>
-      <div class=stat><div class=k>${t('overview.stat_active')}</div><div class=v>—</div><div class=sub>—</div></div>
-      <div class=stat><div class=k>${t('overview.stat_bonded')}</div><div class=v>—</div><div class=sub>—</div></div>
-    </div>
-    <div class=card><div class=ctitle>${t('overview.today_label')}</div><div id=todayList class=empty>${t('common.loading')}</div></div>
-    <div class=card><div class=ctitle>${t('overview.cal_label')}</div><div id=calBox class=empty>${t('common.loading')}</div></div>
     <div class=card><div class=ctitle>${t('overview.res_label')}</div><div id=resBox></div></div>`;
   await loadOverview();
 }
@@ -929,296 +786,15 @@ function renderResBox(box,s){
     </dl>
     <div class=barwrap><div class='bar${barCls}' style='width:${pct}%'></div></div>
     <dl class=kv style='margin-top:14px'>
-      <dt>${t('overview.events_file')}</dt><dd class=mono>${fmtBytes(s.events_bytes)} · ${s.events_count||0} ${t('overview.events_unit')}</dd>
       <dt>${t('overview.ram_free')}</dt><dd class=mono>${fmtBytes(s.heap_free)}</dd>
       <dt>${t('overview.uptime')}</dt><dd class=mono>${fmtDur(s.uptime_s)}</dd>
-      <dt>${t('overview.ble_name')}</dt><dd class=mono>${s.ble||'-'}</dd>
+      <dt>${t('overview.device_name')}</dt><dd class=mono>${s.device_name||'-'}</dd>
     </dl>`;
 }
 
 async function loadOverview(){
   const s=state.status||{};
   renderResBox($('resBox'),s);
-
-  const wr=await fetch('/api/workers').then(r=>r.json()).catch(()=>({workers:[]}));
-  state.workers=wr.workers||[];
-  state.workersById={};state.workers.forEach(w=>state.workersById[w.id]=w);
-
-  const td=await fetch('/api/today').then(r=>r.json()).catch(()=>null);
-  if(td){
-    const ws=td.workers||[];
-    const inNow=ws.filter(w=>w.currently_in).length;
-    const totalSegs=ws.reduce((a,w)=>a+w.segments,0);
-    const bondsR=await fetch('/api/bonds').then(r=>r.json()).catch(()=>({count:0}));
-    $('statsRow').innerHTML=`
-      <div class=stat><div class=k>${t('overview.stat_on_site')}</div><div class=v>${inNow}<span class=unit>${t('overview.unit_people')}</span></div><div class=sub>${t('overview.active_workers',ws.length)}</div></div>
-      <div class=stat><div class=k>${t('overview.stat_active')}</div><div class=v>${totalSegs}<span class=unit>${t('overview.unit_sessions')}</span></div><div class=sub>${t('overview.in_out_events',ws.reduce((a,w)=>a+w.segments*2,0))}</div></div>
-      <div class=stat><div class=k>${t('overview.stat_bonded')}</div><div class=v>${bondsR.count}<span class=unit>${t('overview.unit_iphone')}</span></div><div class=sub>${t('overview.of_workers',state.workers.length)} · ${t('overview.bond_cap',bondsR.max||8)}</div></div>`;
-    if(ws.length===0){$('todayList').innerHTML=`<div class=empty>${t('overview.no_today')}</div>`;}
-    else{
-      $('todayList').innerHTML=`<table>
-        <thead><tr><th>${t('overview.col_worker')}</th><th>${t('overview.col_sessions')}</th><th>${t('overview.col_total')}</th><th>${t('overview.col_status')}</th></tr></thead>
-        <tbody>${ws.map(w=>`<tr>
-          <td>${escAttr(w.name||('id='+w.worker_id))}${w.category?` <span class=t-mute>· ${escAttr(w.category)}</span>`:''}</td>
-          <td>${w.segments}</td>
-          <td class=mono>${fmtDur(w.total_seconds)}</td>
-          <td>${w.currently_in?`<span class=t-pos>${t('overview.on_site')}</span>`:`<span class=t-mute>${t('overview.left')}</span>`}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-  }
-
-  const cd=await fetch('/api/calendar?days=30').then(r=>r.json()).catch(()=>null);
-  if(cd){
-    const buckets={};(cd.buckets||[]).forEach(b=>buckets[b.date_unix]=b);
-    const dayMs=86400000,fromMs=cd.from_unix*1000;
-    const wkdays=t('cal.weekdays').split(',');
-    let h='<div class=cal>'+wkdays.map(d=>`<div class=h>${d}</div>`).join('');
-    const startWkd=new Date(fromMs).getDay();
-    for(let i=0;i<startWkd;i++)h+='<div></div>';
-    for(let i=0;i<cd.days;i++){
-      const dt=new Date(fromMs+i*dayMs);
-      const localMid=Math.floor(new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()).getTime()/1000);
-      const b=buckets[localMid],ev=b?b.events:0;
-      const ds=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-      h+=`<div class='calcell${ev>0?' has':''}' data-date='${ds}'>
-        <div class=d>${dt.getDate()}</div><div class=n>${ev||''}</div></div>`;
-    }
-    h+='</div><div id=calDay style="margin-top:14px"></div>';
-    $('calBox').innerHTML=h;
-    document.querySelectorAll('.calcell.has').forEach(c=>c.onclick=()=>loadCalDay(c.dataset.date));
-  }
-}
-
-async function loadCalDay(date){
-  const box=$('calDay');
-  box.innerHTML=`<div class='mono t-mute' style='margin-bottom:6px'>${date}</div>`;
-  const r=await fetch('/api/events?date='+encodeURIComponent(date)).then(r=>r.json()).catch(()=>null);
-  if(!r){box.innerHTML+=`<div class=empty>${t('common.load_failed')}</div>`;return;}
-  const evs=(r.events||[]).slice().reverse();
-  if(evs.length===0){box.innerHTML+=`<div class=empty>${t('overview.no_events_day')}</div>`;return;}
-  box.innerHTML+=`<table><thead><tr><th>${t('overview.col_time')}</th><th>${t('overview.col_type')}</th><th>${t('overview.col_worker')}</th><th>${t('overview.col_source')}</th></tr></thead>
-    <tbody>${evs.map(e=>`<tr>
-      <td class=mono>${fmtTime(e.ts)}</td>
-      <td><span class='evtype ${e.type}'>${e.type}</span></td>
-      <td>${workerLabel(e)}</td>
-      <td class='mono t-mute'>${e.src}</td></tr>`).join('')}</tbody></table>`;
-}
-
-async function renderAttendance(){
-  $('main').innerHTML=`
-    <div class=ph><h1>${t('attendance.title')}</h1><div class=desc>${t('attendance.desc')}</div></div>
-    <div class=card>
-      <div class=row style='margin-bottom:12px;flex-wrap:wrap;gap:10px'>
-        <div class=seg id=viewSeg>
-          <button data-mode=raw class='${state.pairedMode?'':'on'}'>${t('attendance.raw_view')}</button>
-          <button data-mode=paired class='${state.pairedMode?'on':''}'>${t('attendance.sessions_view')}</button>
-        </div>
-        <select class=input id=workerFilter style='min-width:140px'><option value=''>${t('attendance.all_workers')}</option></select>
-        <div class=grow></div>
-        <button class='btn ghost sm' id=refreshEvB title='${t('common.refresh')}'>↻</button>
-      </div>
-      <div id=eventsList class=empty>${t('common.loading')}</div>
-    </div>
-    <div class=card>
-      <div class=ctitle>${t('attendance.export_label')}</div>
-      <div class=row style='margin-bottom:8px;flex-wrap:wrap'>
-        <span class='mono t-mute'>${t('attendance.from')}</span>
-        <input id=expFrom type=date class=input style='max-width:160px'>
-        <span class='mono t-mute'>${t('attendance.to')}</span>
-        <input id=expTo type=date class=input style='max-width:160px'>
-      </div>
-      <div class=row style='flex-wrap:wrap'>
-        <button class=btn id=expRawCsv>${t('attendance.raw_csv')}</button>
-        <button class='btn primary' id=expPairCsv>${t('attendance.sessions_csv')}</button>
-        <button class='btn ghost' id=expJsonl>${t('attendance.jsonl')}</button>
-      </div>
-    </div>
-    <div class=section>${t('system.section_danger')}</div>
-    <div class=card>
-      <div class=cdesc>${t('attendance.wipe_hint')}</div>
-      <button class='btn danger' id=wipeB>${t('attendance.wipe')}</button>
-    </div>`;
-
-  if(state.workers.length===0){
-    const r=await fetch('/api/workers').then(r=>r.json()).catch(()=>({workers:[]}));
-    state.workers=r.workers||[];
-    state.workersById={};state.workers.forEach(w=>state.workersById[w.id]=w);
-  }
-  const wf=$('workerFilter');
-  wf.innerHTML=`<option value="">${t('attendance.all_workers')}</option>`+
-    state.workers.map(w=>`<option value=${w.id}>${escAttr(w.name)} (id=${w.id})</option>`).join('');
-  wf.onchange=loadEvents;
-  document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{
-    const next = b.dataset.mode==='paired';
-    if(state.pairedMode===next)return;
-    state.pairedMode=next;
-    renderAttendance();
-  });
-  $('refreshEvB').onclick=loadEvents;
-  $('wipeB').onclick=async()=>{if(!confirm(t('attendance.wipe_confirm')))return;
-    await fetch('/api/events/wipe',{method:'POST'});loadEvents();};
-
-  function expUrl(fmt,mode){const f=$('expFrom').value,tt=$('expTo').value;
-    let q='format='+fmt;if(mode)q+='&mode='+mode;
-    if(f)q+='&from='+f;if(tt)q+='&to='+tt;return '/api/events/export?'+q;}
-  $('expRawCsv').onclick=()=>location=expUrl('csv');
-  $('expPairCsv').onclick=()=>location=expUrl('csv','paired');
-  $('expJsonl').onclick=()=>location=expUrl('jsonl');
-
-  loadEvents();
-}
-
-async function loadEvents(){
-  const wid=$('workerFilter')?.value||'';
-  const url=state.pairedMode?'/api/events/paired':'/api/events?limit=50'+(wid?'&worker_id='+wid:'');
-  const r=await fetch(url).then(r=>r.json()).catch(()=>null);
-  if(!r){$('eventsList').innerHTML=`<div class=empty>${t('common.load_failed')}</div>`;return;}
-  if(state.pairedMode){
-    let segs=(r.segments||[]);
-    if(wid)segs=segs.filter(s=>s.worker_id==+wid);
-    segs=segs.slice(-50).reverse();
-    if(segs.length===0){$('eventsList').innerHTML=`<div class=empty>${t('attendance.no_sessions')}</div>`;return;}
-    $('eventsList').innerHTML=`<table><thead><tr><th>${t('overview.col_worker')}</th><th>${t('attendance.col_start')}</th><th>${t('attendance.col_end')}</th><th>${t('attendance.col_duration')}</th></tr></thead>
-      <tbody>${segs.map(s=>`<tr>
-        <td>${s.worker_id?escAttr(state.workersById[s.worker_id]?.name||('id='+s.worker_id)):'?'}</td>
-        <td class=mono>${fmtTs(s.in_ts)}</td>
-        <td class=mono>${s.open?`<span class=t-pos>${t('overview.on_site')}</span>`:fmtTs(s.out_ts)}</td>
-        <td class=mono>${s.open?'…':fmtDur(s.duration_s)}</td>
-      </tr>`).join('')}</tbody></table>`;
-  }else{
-    const evs=(r.events||[]).slice().reverse();
-    if(evs.length===0){$('eventsList').innerHTML=`<div class=empty>${t('attendance.no_events')}</div>`;return;}
-    $('eventsList').innerHTML=`<table><thead><tr><th>${t('overview.col_time')}</th><th>${t('overview.col_type')}</th><th>${t('overview.col_worker')}</th><th>${t('overview.col_source')}</th><th>${t('attendance.col_note')}</th><th></th></tr></thead>
-      <tbody>${evs.map(e=>`<tr>
-        <td class=mono title='${fmtTs(e.ts)}'>${fmtRel(e.ts)}</td>
-        <td><span class='evtype ${e.type}'>${e.type}</span></td>
-        <td>${workerLabel(e)}</td>
-        <td class='mono t-mute'>${e.src}</td>
-        <td class='mono t-mute'>${e.note?escAttr(e.note):''}</td>
-        <td><button class='btn ghost sm evDel' data-ts='${e.ts||0}' data-mono='${e.mono_us||0}' title='${t('attendance.delete_one')}'>×</button></td>
-      </tr>`).join('')}</tbody></table>`;
-    document.querySelectorAll('.evDel').forEach(b=>b.onclick=async()=>{
-      if(!confirm(t('attendance.delete_one_confirm')))return;
-      const r=await fetch('/api/events/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ts:+b.dataset.ts,mono_us:+b.dataset.mono})});
-      if(r.ok)loadEvents(); else alert(t('common.failed'));
-    });
-  }
-}
-
-function workerLabel(e){if(e.worker_id){return escAttr(state.workersById[e.worker_id]?.name||('id='+e.worker_id));}return e.peer||'-';}
-
-async function renderPeople(){
-  $('main').innerHTML=`
-    <div class=ph><h1>${t('people.title')}</h1><div class=desc>${t('people.desc')}</div></div>
-    <div class=card>
-      <div class='row between' style='margin-bottom:6px;align-items:flex-start'>
-        <div>
-          <div class=ctitle>${t('people.pairing_title')}</div>
-          <div class=cdesc style='margin-bottom:0'>${t('people.pairing_desc')}</div>
-        </div>
-        <button class='btn primary' id=pairB>${t('people.start')}</button>
-      </div>
-      <div id=pairBox></div>
-    </div>
-    <div class=card>
-      <div class=ctitle>${t('people.workers_title')} · <span id=workersCount class=t-mute style='font-weight:400'>0</span></div>
-      <div id=workersList class=empty>${t('common.loading')}</div>
-    </div>`;
-  $('pairB').onclick=async()=>{
-    const r=await fetch('/api/pairing/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ttl_ms:30000})});
-    if(!r.ok){alert(t('people.start_failed'));return;}
-    $('pairB').disabled=true;
-    pollPair();
-  };
-  loadWorkers();
-}
-
-function pollPair(){
-  const box=$('pairBox');
-  let confirming=false;
-  // Track the pending setTimeout so finish() (or a tab-switch cleanup in
-  // render()) can cancel the recursive tick chain — otherwise stale ticks
-  // keep firing against a dead DOM after pairing closes.
-  if(state.pairTimer){clearTimeout(state.pairTimer);state.pairTimer=null;}
-  const finish=()=>{
-    if(state.pairTimer){clearTimeout(state.pairTimer);state.pairTimer=null;}
-    if($('pairB')){$('pairB').disabled=false;}
-    loadWorkers();
-  };
-  const tick=async()=>{
-    state.pairTimer=null;
-    if(confirming){state.pairTimer=setTimeout(tick,500);return;}
-    const s=await fetch('/api/pairing/status').then(r=>r.json()).catch(()=>({active:false}));
-    if(!s.active){box.innerHTML=`<div class="t-mute" style="font-size:12px;margin-top:8px">${t('people.window_closed')}</div>`;finish();return;}
-    const sec=Math.ceil(s.remaining_ms/1000);
-    const dev=state.status?.ble||'crino-XXXX';
-    if(s.numcmp&&s.numcmp>0){
-      box.innerHTML=`<div class=passkey>${String(s.numcmp).padStart(6,'0')}</div>
-        <div class='t-mute' style='font-size:12px;text-align:center;margin-top:10px'>
-          ${t('people.numcmp_l1_html')}<br>
-          ${t('people.numcmp_l2_html')}
-        </div>
-        <div class=row style='justify-content:center;margin-top:12px'>
-          <button class='btn ghost sm' id=cancelB>${t('people.cancel_pair')}</button>
-        </div>`;
-      $('cancelB').onclick=async()=>{await fetch('/api/pairing/cancel',{method:'POST'});box.innerHTML='';finish();};
-    }else{
-      box.innerHTML=`<div style='text-align:center;padding:18px 0'>
-        <div style='font-size:14px;color:var(--t1)'>${t('people.tap_html',dev)}</div>
-        <div class='t-mute' style='font-size:12px;margin-top:8px'>${t('people.after_connect')}</div>
-        <div class=note>${t('people.remaining',sec)}</div>
-      </div>
-      <div class=row style='justify-content:center;margin-top:8px'>
-        <button class='btn ghost sm' id=cancelB>${t('people.cancel_pair')}</button>
-      </div>`;
-      $('cancelB').onclick=async()=>{await fetch('/api/pairing/cancel',{method:'POST'});box.innerHTML='';finish();};
-    }
-    state.pairTimer=setTimeout(tick,1000);
-  };
-  tick();
-}
-
-async function loadWorkers(){
-  const a=document.activeElement;
-  if(a?.tagName==='INPUT'&&a.dataset?.id)return;
-  const r=await fetch('/api/workers').then(r=>r.json()).catch(()=>({workers:[]}));
-  state.workers=r.workers||[];
-  state.workersById={};state.workers.forEach(w=>state.workersById[w.id]=w);
-  if($('workersCount'))$('workersCount').textContent=state.workers.length;
-  const box=$('workersList');if(!box)return;
-  if(state.workers.length===0){box.innerHTML=`<div class=empty>${t('people.no_workers')}</div>`;return;}
-  box.innerHTML=state.workers.map(w=>`
-    <div class=wrow data-w=${w.id}>
-      <div class=row style='flex-wrap:wrap'>
-        <input class='input w-name' data-id=${w.id} data-field=name value='${escAttr(w.name)}' placeholder='${t('people.name_ph')}'>
-        <input class='input w-cat' data-id=${w.id} data-field=category value='${escAttr(w.category)}' placeholder='${t('people.cat_ph')}'>
-        <button class='btn sm saveW' data-id=${w.id}>${t('common.save')}</button>
-        <button class='btn sm punchW' data-id=${w.id} data-type=in style='color:var(--success);border-color:rgba(76,183,130,.30)'>${t('people.in')}</button>
-        <button class='btn sm punchW' data-id=${w.id} data-type=out style='color:var(--danger);border-color:rgba(232,95,95,.30)'>${t('people.out')}</button>
-        <div class=grow></div>
-        <button class='btn sm danger revokeW' data-id=${w.id}>${t('people.delete')}</button>
-      </div>
-      <div class=wrow-meta>
-        <span>id=${w.id}</span><span class=sep>·</span>
-        <span>${w.addr}</span><span class=sep>·</span>
-        <span>${w.bonded?`<span class=t-pos>${t('people.bonded')}</span>`:`<span class=t-mute>${t('people.not_bonded')}</span>`}</span>
-      </div>
-    </div>`).join('');
-  document.querySelectorAll('.saveW').forEach(b=>b.onclick=async()=>{
-    const id=+b.dataset.id;
-    const inputs=document.querySelectorAll(`input[data-id='${id}']`);
-    const body={id};inputs.forEach(i=>body[i.dataset.field]=i.value);
-    const r=await fetch('/api/workers/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(r.ok){b.textContent='✓';setTimeout(()=>b.textContent=t('common.save'),1000);}else alert(t('common.failed'));});
-  document.querySelectorAll('.punchW').forEach(b=>b.onclick=async()=>{
-    const id=+b.dataset.id,type=b.dataset.type;
-    const note=prompt(t('people.note_prompt'),'')||'';
-    const r=await fetch('/api/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({worker_id:id,type,note:note||'web manual'})});
-    if(r.ok){b.textContent='✓';setTimeout(()=>b.textContent=type==='in'?t('people.in'):t('people.out'),900);}else alert(t('common.failed'));});
-  document.querySelectorAll('.revokeW').forEach(b=>b.onclick=async()=>{
-    if(!confirm(t('people.delete_confirm')))return;
-    await fetch('/api/workers/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:+b.dataset.id})});
-    loadWorkers();});
 }
 
 function renderSystem(){
@@ -1226,25 +802,13 @@ function renderSystem(){
     <div class=ph><h1>${t('system.title')}</h1><div class=desc>${t('system.desc')}</div></div>
 
     <div class=section>${t('system.section_settings')}</div>
-    <div class=s-grid>
-      <div class=card>
-        <div class=ctitle>${t('system.led_label')}</div>
-        <label class=row style='gap:8px;cursor:pointer;user-select:none'>
-          <input type=checkbox id=ledToggle disabled>
-          <span>${t('system.led_toggle')}</span>
-        </label>
-        <div class=note>${t('system.led_note')}</div>
-      </div>
-      <div class=card>
-        <div class=ctitle>${t('system.presence_label')}</div>
-        <div class=row>
-          <input class=input id=presenceTimeout type=number min=30 max=600 step=5 style='max-width:100px'>
-          <span class='t-mute' style='font-size:12px'>${t('system.presence_unit')}</span>
-          <div class=grow></div>
-          <button class=btn id=presenceSaveB>${t('common.save')}</button>
-        </div>
-        <div class=note>${t('system.presence_note')}</div>
-      </div>
+    <div class=card>
+      <div class=ctitle>${t('system.led_label')}</div>
+      <label class=row style='gap:8px;cursor:pointer;user-select:none'>
+        <input type=checkbox id=ledToggle disabled>
+        <span>${t('system.led_toggle')}</span>
+      </label>
+      <div class=note>${t('system.led_note')}</div>
     </div>
     <div class=card>
       <div class=ctitle>${t('system.dev_name_label')}</div>
@@ -1351,17 +915,6 @@ function renderSystem(){
       if(!r.ok){cb.checked=!cb.checked;alert(t('common.failed'));}
     };
   }).catch(()=>{});
-  fetch('/api/system/presence_timeout').then(r=>r.json()).then(d=>{
-    const inp=$('presenceTimeout');if(!inp)return;
-    inp.value=d.timeout_s||60;
-  }).catch(()=>{});
-  $('presenceSaveB').onclick=async e=>{
-    const v=parseInt($('presenceTimeout').value,10);
-    if(!(v>=30&&v<=600)){alert(t('system.presence_range'));return;}
-    const r=await fetch('/api/system/presence_timeout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({timeout_s:v})});
-    if(r.ok){e.target.textContent='✓';setTimeout(()=>e.target.textContent=t('common.save'),1000);}
-    else alert(t('common.failed'));
-  };
   fetch('/api/system/ntp_server').then(r=>r.json()).then(d=>{
     if($('ntpServer'))$('ntpServer').value=d.server||'';
     if($('ntpStatus'))$('ntpStatus').textContent=
@@ -1464,8 +1017,6 @@ async function loadDiag(){
       <div class=k>${t('diag.disk')}</div>
       <div class=v>${fmtBytes(fs.used)}<span class=u>/ ${fmtBytes(fs.total)}</span></div>
       <div class=barwrap><div class='bar ${fsCls}' style='width:${fsPct}%'></div></div>
-      <div class=sub>${t('diag.events_file')} ${fmtBytes(fs.events_file_bytes)} <span class=t-mute>/ ${fmtBytes(r.events_retention?.max_bytes_cap||0)}</span></div>
-      <div class=sub>${t('diag.retention',r.events_retention?.retention_days||0)}</div>
     </div>
     <div class=tile>
       <div class=k>${t('diag.ota_slot')}</div>
