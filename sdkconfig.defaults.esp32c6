@@ -1,2 +1,9 @@
 # Target-specific overlay applied automatically by IDF when building for esp32c6.
 CONFIG_IDF_TARGET="esp32c6"
+
+# The chassis doesn't use 802.15.4 / Thread / Zigbee. Disable them in the
+# chassis default to shave ~80 KB off the C6 binary so it fits with
+# headroom in the 1 MB factory partition slot. Apps that need them can
+# re-enable in their own sdkconfig.
+CONFIG_IEEE802154_ENABLED=n
+CONFIG_OPENTHREAD_ENABLED=n
