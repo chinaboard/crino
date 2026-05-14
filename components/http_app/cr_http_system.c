@@ -121,6 +121,8 @@ esp_err_t status_get(httpd_req_t *req)
 {
     cJSON *j = cJSON_CreateObject();
     cJSON_AddStringToObject(j, "mode", cr_boot_mode_str(cr_config_boot_mode()));
+    cJSON_AddBoolToObject(j, "recovery_mode", cr_metrics_in_recovery_mode());
+    cJSON_AddNumberToObject(j, "boot_loop_count", (double)cr_metrics_boot_loop_count());
     cJSON_AddStringToObject(j, "wifi", cr_wifi_state_str(cr_wifi_state()));
     char ip[16]; cr_wifi_get_ip(ip, sizeof(ip));
     cJSON_AddStringToObject(j, "ip", ip);

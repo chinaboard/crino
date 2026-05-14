@@ -61,6 +61,23 @@ esp_err_t cr_metrics_record_boot(void);   // increments boot_count, returns new
 esp_err_t cr_metrics_save_uptime(uint32_t seconds);  // total += seconds, last = seconds
 esp_err_t cr_metrics_reset(void);          // zeros boot_count + total/last uptime
 
+// ---------- boot-loop recovery ("unbrickable" guard) ----------
+//
+// Persisted counter incremented at app_main entry, cleared after the same
+// 60s window that marks the OTA image valid. If a freshly booted image
+// reaches CR_BOOT_LOOP_RECOVERY_THRESHOLD before clearing the counter,
+// the chassis forces SoftAP recovery mode (regardless of saved WiFi
+// creds) so the user can OTA a working image back without USB access.
+//
+// Triggered by anything that prevents reaching the 60s healthy mark:
+// panic loops, watchdog resets, hangs that prevent the OTA validate
+// timer from running, brownouts, etc. Reset by cr_metrics_boot_loop_clear().
+#define CR_BOOT_LOOP_RECOVERY_THRESHOLD 3
+uint32_t  cr_metrics_boot_loop_inc(void);   // bump + return new value
+uint32_t  cr_metrics_boot_loop_count(void); // peek current value (no mutation)
+void      cr_metrics_boot_loop_clear(void); // call once we know boot is healthy
+bool      cr_metrics_in_recovery_mode(void); // counter ≥ THRESHOLD
+
 // Restart-cause hint persisted across reboots so we can distinguish OTA /
 // admin-triggered / factory / setup / heap-critical / unknown (= crash if
 // esp_reset_reason() is sw without us setting anything). Each callsite that
@@ -74,6 +91,7 @@ typedef enum {
     CR_RESTART_FACTORY       = 3,   // /api/system/factory_reset OR boot button long-press
     CR_RESTART_SETUP         = 4,   // first-run /api/setup
     CR_RESTART_HEAP_CRITICAL = 5,   // heap watchdog forced restart
+    CR_RESTART_BOOT_LOOP     = 6,   // forced into recovery after N failed boots
 } cr_restart_cause_t;
 
 void cr_metrics_set_restart_cause(cr_restart_cause_t c);

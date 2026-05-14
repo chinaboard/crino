@@ -161,14 +161,18 @@ static esp_err_t start_softap(void)
     // STA netif also created so esp_wifi_scan_start can run while AP is up.
     s_netif_sta = esp_netif_create_default_wifi_sta();
 
-    // Build per-device SSID `crino-setup-XXXX` from the BT MAC last 2
-    // bytes. Using BT MAC (not WiFi MAC) so the suffix matches the BLE
-    // device name `crino-XXXX` — one identifier per physical device.
+    // Build per-device SSID `crino-setup-XXXX` (or `crino-rec-XXXX` in
+    // recovery mode) from the BT MAC last 2 bytes. Using BT MAC (not WiFi
+    // MAC) so the suffix matches the mDNS hostname `crino-XXXX` — one
+    // identifier per physical device.
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_BT);
     char ssid[AP_SSID_MAX];
-    int slen = snprintf(ssid, sizeof(ssid), AP_SSID_PREFIX "%02X%02X",
-                        mac[4], mac[5]);
+    const char *prefix = cr_metrics_in_recovery_mode()
+        ? "crino-rec-"   // boot-loop recovery — visible at a glance
+        : AP_SSID_PREFIX;
+    int slen = snprintf(ssid, sizeof(ssid), "%s%02X%02X",
+                        prefix, mac[4], mac[5]);
 
     wifi_config_t cfg = {
         .ap = {
@@ -183,6 +187,7 @@ static esp_err_t start_softap(void)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
+    ESP_LOGI(TAG, "SoftAP up, SSID=%.*s", slen, ssid);
     return ESP_OK;
 }
 
@@ -233,6 +238,18 @@ esp_err_t cr_wifi_start(void)
         WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi_event, NULL, NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         IP_EVENT, IP_EVENT_STA_GOT_IP, on_wifi_event, NULL, NULL));
+
+    // Recovery mode forces SoftAP regardless of saved creds. Triggered by
+    // CR_BOOT_LOOP_RECOVERY_THRESHOLD consecutive boots that didn't reach
+    // the 60s healthy mark — typically panic loops, watchdogs, or hangs
+    // that prevent OTA validation from clearing the counter. The user
+    // recovers by joining the SoftAP and uploading a working image via
+    // /api/system/ota.
+    if (cr_metrics_in_recovery_mode()) {
+        ESP_LOGE(TAG, "BOOT-LOOP RECOVERY: %u consecutive failures → forced SoftAP",
+                 (unsigned)cr_metrics_boot_loop_count());
+        return start_softap();
+    }
 
     cr_boot_mode_t mode = cr_config_boot_mode();
     if (mode == CR_BOOT_NORMAL) {
