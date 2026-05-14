@@ -768,6 +768,10 @@ esp_err_t ota_post(httpd_req_t *req)
     }
 
     ESP_LOGW(TAG, "OTA complete (%d bytes), rebooting in 2s", received);
+    // Reset the boot-loop counter — the user just told us they have a
+    // working image, so the next boot is "user-blessed" and shouldn't
+    // start halfway up the recovery ramp.
+    cr_metrics_boot_loop_clear();
     cr_metrics_set_restart_cause(CR_RESTART_OTA);
     reply_text(req, "200 OK", "ok, rebooting into new image");
     schedule_restart(2000);

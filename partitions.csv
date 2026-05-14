@@ -1,7 +1,30 @@
+# Layout (4 MB flash):
+#   0x00000 - 0x08000  bootloader (32 KB)
+#   0x08000 - 0x09000  partition_table (4 KB)
+#   0x09000 - 0x0F000  nvs (24 KB)                  - data, never OTA-touched
+#   0x0F000 - 0x10000  phy_init (4 KB)
+#   0x10000 - 0x12000  otadata (8 KB)
+#   0x20000 - 0x120000 factory (1024 KB)           - immutable rescue (64KB aligned)
+#   0x120000 - 0x260000 ota_0 (1280 KB)            - app slot A
+#   0x260000 - 0x3A0000 ota_1 (1280 KB)            - app slot B
+#   0x3A0000 - 0x400000 storage (384 KB) LittleFS  - app data
+#
+# Factory is the "刷不死" piece: even if both OTA slots contain a panic-loop
+# image, the boot-loop recovery code calls esp_ota_set_boot_partition() on
+# the factory entry and reboots, which the bootloader honours. The factory
+# image is just the crino chassis (Web UI + SoftAP + OTA upload) so the
+# user always has a way to upload a working image back. OTA writes always
+# target ota_0/ota_1 — the factory partition is read-only at runtime and
+# cannot be erased by any HTTP/OTA path. Reach it via JTAG/USB flash only.
+#
+# App partitions (factory / ota_X) must be 64 KB (0x10000) aligned, which
+# is why factory starts at 0x20000 — the 56 KB between 0x12000 (end of
+# otadata) and 0x20000 is unavoidable padding.
 # Name,     Type, SubType,  Offset,    Size,     Flags
 nvs,        data, nvs,      0x9000,    0x6000,
 phy_init,   data, phy,      0xf000,    0x1000,
 otadata,    data, ota,      0x10000,   0x2000,
-ota_0,      app,  ota_0,    0x20000,   0x180000,
-ota_1,      app,  ota_1,    0x1A0000,  0x180000,
-storage,    data, spiffs,   0x320000,  0xE0000,
+factory,    app,  factory,  0x20000,   0x100000,
+ota_0,      app,  ota_0,    0x120000,  0x140000,
+ota_1,      app,  ota_1,    0x260000,  0x140000,
+storage,    data, spiffs,   0x3A0000,  0x60000,

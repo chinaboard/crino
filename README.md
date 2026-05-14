@@ -24,25 +24,43 @@ of headroom for app code + ~131 KB free heap on ESP32-C3.
 
 ## Unbrickable recovery
 
-Two layered safety nets keep the device recoverable from any state without
-USB access:
+Three layered safety nets keep the device recoverable from any state
+without USB access:
 
 **Layer 1 — OTA rollback** (built into ESP-IDF, used by crino):
 After an OTA update the bootloader marks the new image as "pending verify".
 If the new image panics within 60 seconds, the bootloader auto-reverts to
 the previous image at the next boot.
 
-**Layer 2 — Boot-loop recovery** (chassis):
+**Layer 2 — Boot-loop counter** (chassis):
 Persistent NVS counter `boot_loop` is bumped at every `app_main` entry and
 cleared by the same 60s timer that validates the OTA image. If three
 consecutive boots bump the counter without ever reaching the 60s healthy
 mark — anything from a panic loop after rollback to a watchdog hang to a
-brownout cycle — the chassis forces SoftAP recovery mode regardless of
-saved WiFi creds. The recovery SSID is `crino-rec-XXXX` (vs the normal
-`crino-setup-XXXX`) so a phone scan immediately shows the device is in
-trouble. The Web UI prints a red banner on every page; recovery is just
-"upload a working .bin via System → Firmware OTA". Threshold is in
-`CR_BOOT_LOOP_RECOVERY_THRESHOLD` (default 3).
+brownout cycle — the chassis arms recovery mode. The recovery SSID is
+`crino-rec-XXXX` (vs the normal `crino-setup-XXXX`) so a phone scan
+immediately shows the device is in trouble. The Web UI prints a red
+banner on every page; recovery is just "upload a working .bin via System
+→ Firmware OTA". Threshold is in `CR_BOOT_LOOP_RECOVERY_THRESHOLD`
+(default 3).
+
+**Layer 3 — Factory partition handoff** (chassis + `partitions.csv`):
+The partition table reserves a 1 MB `factory` slot that holds an
+immutable crino chassis image. OTA writes only ever target `ota_0` /
+`ota_1` — the factory partition is read-only at runtime and cannot be
+erased by any HTTP path. When Layer 2 recovery arms AND the bad app is
+running from one of the OTA slots, the chassis calls
+`esp_ota_set_boot_partition(factory)` + reboots. The bootloader honours
+that and jumps to the immutable chassis. From there the user uploads a
+fixed image via the chassis's own Web UI — the new image lands in
+`ota_0` and the chassis hands control back. The factory image is reach-
+able only via JTAG/USB re-flash. So even if `ota_0` AND `ota_1` are both
+panic-loop images, the device is recoverable purely over WiFi.
+
+The `make flash` command writes the chassis to the factory partition on
+first flash, so a newly-flashed board boots straight into the rescue
+image. Subsequent firmware updates use the OTA workflow and target the
+ota_X slots.
 
 ## Build
 

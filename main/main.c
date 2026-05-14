@@ -3,6 +3,7 @@
 #include "esp_chip_info.h"
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
+#include "esp_partition.h"
 #include "esp_app_desc.h"
 #include "esp_timer.h"
 #include "esp_system.h"
@@ -164,6 +165,50 @@ static void dump_chip(void)
 // Web UI.
 __attribute__((weak)) void cr_app_init(void) { }
 
+// Boot-loop recovery hand-off: switch the boot partition to the factory
+// image and restart. The factory partition holds the immutable crino
+// chassis; OTA never touches it. Called only when (a) the boot-loop
+// counter has armed recovery AND (b) we are NOT already running from
+// factory. After the handoff the bootloader picks up the factory entry
+// from otadata and boots a known-good chassis. The recovery banner / UI
+// still works there because the chassis is what's running. User then
+// uses /api/system/ota to write a working image to ota_0 and the
+// chassis automatically jumps back to it after upload.
+bool cr_recovery_handoff_to_factory(void)
+{
+    if (!cr_metrics_in_recovery_mode()) return false;
+
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (running && running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY) {
+        // Already in factory — the chassis's SoftAP recovery path
+        // handles the rest, no need to switch partitions again.
+        return false;
+    }
+
+    const esp_partition_t *factory = esp_partition_find_first(
+        ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
+    if (!factory) {
+        // No factory partition in this build's table — fall back to
+        // the SoftAP-only recovery path that doesn't require it.
+        ESP_LOGW(TAG, "recovery: no factory partition, falling back to SoftAP-only");
+        return false;
+    }
+
+    esp_err_t err = esp_ota_set_boot_partition(factory);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "recovery: set_boot_partition(factory) rc=%s",
+                 esp_err_to_name(err));
+        return false;
+    }
+
+    ESP_LOGE(TAG, "*** boot-loop recovery: jumping to factory partition '%s' ***",
+             factory->label);
+    cr_metrics_set_restart_cause(CR_RESTART_BOOT_LOOP);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_restart();
+    return true;  // unreachable
+}
+
 void app_main(void)
 {
     // Give USB Serial/JTAG host time to re-enumerate after a flash so we can
@@ -177,6 +222,16 @@ void app_main(void)
 
     ESP_LOGI(TAG, "==========================================");
     ESP_LOGI(TAG, " crino v%s booting", esp_app_get_description()->version);
+    {
+        const esp_partition_t *p = esp_ota_get_running_partition();
+        if (p) {
+            const char *kind =
+                p->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY ? "FACTORY (rescue)" :
+                p->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0   ? "ota_0"            :
+                p->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1   ? "ota_1"            : "?";
+            ESP_LOGI(TAG, " running from partition '%s' (%s)", p->label, kind);
+        }
+    }
     dump_chip();
 
     ESP_ERROR_CHECK(cr_config_init());
@@ -193,6 +248,11 @@ void app_main(void)
         if (bl >= CR_BOOT_LOOP_RECOVERY_THRESHOLD) {
             ESP_LOGE(TAG, "*** BOOT-LOOP RECOVERY ARMED *** count=%u (≥%d)",
                      (unsigned)bl, CR_BOOT_LOOP_RECOVERY_THRESHOLD);
+            // Hand off to factory partition if we're not already there.
+            // If this returns (no factory, or already in factory) we
+            // continue boot and fall back to the SoftAP-only recovery
+            // path in cr_wifi_start.
+            cr_recovery_handoff_to_factory();
             cr_metrics_set_restart_cause(CR_RESTART_BOOT_LOOP);
         } else if (bl > 1) {
             ESP_LOGW(TAG, "boot-loop counter=%u (recovery at %d)",

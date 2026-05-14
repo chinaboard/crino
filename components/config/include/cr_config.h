@@ -71,6 +71,11 @@ esp_err_t cr_metrics_reset(void);          // zeros boot_count + total/last upti
 // the chassis forces SoftAP recovery mode (regardless of saved WiFi
 // creds) so the user can OTA a working image back without USB access.
 //
+// When the partition table includes a `factory` slot the recovery flow
+// is stronger: instead of just forcing SoftAP from whatever ota slot
+// happens to be running, the chassis hands off to the immutable factory
+// image (which OTA can never overwrite). See cr_recovery_handoff().
+//
 // Triggered by anything that prevents reaching the 60s healthy mark:
 // panic loops, watchdog resets, hangs that prevent the OTA validate
 // timer from running, brownouts, etc. Reset by cr_metrics_boot_loop_clear().
@@ -79,6 +84,15 @@ uint32_t  cr_metrics_boot_loop_inc(void);   // bump + return new value
 uint32_t  cr_metrics_boot_loop_count(void); // peek current value (no mutation)
 void      cr_metrics_boot_loop_clear(void); // call once we know boot is healthy
 bool      cr_metrics_in_recovery_mode(void); // counter ≥ THRESHOLD
+
+// If running from a non-factory partition AND boot-loop counter is past
+// the recovery threshold, switch the boot partition to the factory image
+// and restart. Returns false (and does nothing) when either condition
+// isn't met — including: counter below threshold, already running from
+// factory, or no factory partition exists in the table. Called once at
+// the very top of app_main (after cr_metrics_record_boot / consume), so
+// the handoff happens before the bad app initializes anything heavy.
+bool cr_recovery_handoff_to_factory(void);
 
 // Restart-cause hint persisted across reboots so we can distinguish OTA /
 // admin-triggered / factory / setup / heap-critical / unknown (= crash if
