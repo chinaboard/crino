@@ -161,9 +161,8 @@ esp_err_t status_get(httpd_req_t *req)
     // a stable URL for after-reboot access. WiFi-MAC-derived; doesn't
     // track the user-changeable display name.
     {
-        uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA);
-        char host[24];
-        snprintf(host, sizeof(host), "crino-%02x%02x", mac[4], mac[5]);
+        char host[32];
+        cr_chassis_hostname(host, sizeof(host));
         cJSON_AddStringToObject(j, "mdns_host", host);
     }
 
@@ -822,8 +821,8 @@ esp_err_t diag_get(httpd_req_t *req)
         esp_read_mac(mac, ESP_MAC_BT);
         cr_format_mac(mac, buf);
         cJSON_AddStringToObject(chip, "mac_bt", buf);
-        char host[24];
-        snprintf(host, sizeof(host), "crino-%02x%02x", mac[4], mac[5]);
+        char host[32];
+        cr_chassis_hostname(host, sizeof(host));
         cJSON_AddStringToObject(chip, "mdns", host);
     }
     cJSON_AddNumberToObject(chip, "temp_c", chip_temp_c());

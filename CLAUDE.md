@@ -62,6 +62,19 @@ make build BOARD=supermini-c3 TZ=JST-9   # Japan
 make build BOARD=supermini-c3 TZ=EST5EDT # US East
 ```
 
+Build-time brand prefix for chassis-derived identifiers (mDNS hostname,
+SoftAP SSIDs, `mdns_host` field in `/api/system/status`). Default
+`crino`; downstream apps re-brand without forking:
+
+```bash
+make build BOARD=supermini-c3 HOSTNAME_PREFIX=fooboard
+# → SoftAP SSID becomes "fooboard-setup-XXXX" / "fooboard-rec-XXXX"
+# → mDNS hostname becomes "fooboard-XXXX.local"
+```
+
+Keep prefix short — `<prefix>-setup-XXXX` must fit in the 32-char
+WiFi SSID limit.
+
 A board file (`boards/<name>.mk`) is plain `KEY=VAL` (sourceable from
 both Make and bash) with these keys:
 

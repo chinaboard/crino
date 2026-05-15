@@ -54,6 +54,15 @@ EXTRA_CFLAGS := -DCR_TZ=\"$(TZ)\" \
                 -DCR_LED_BRIGHTNESS=$(LED_BRIGHTNESS) \
                 -DCR_BOOT_BUTTON_GPIO=$(BOOT_BUTTON_GPIO)
 
+# Branding override: bake a different prefix into the chassis-derived
+# identifiers (mDNS hostname, SoftAP SSIDs, /api/system/status mdns_host).
+# Default in cr_util.h is "crino". Keep short — "<prefix>-setup-XXXX"
+# must fit in the 32-char WiFi SSID limit.
+#   make build BOARD=supermini-c3 HOSTNAME_PREFIX=fooboard
+ifdef HOSTNAME_PREFIX
+EXTRA_CFLAGS += -DCR_HOSTNAME_PREFIX=\"$(HOSTNAME_PREFIX)\"
+endif
+
 # Debug-only WiFi cred override: skip the SoftAP setup wizard and boot a
 # blank board straight into STA mode using these creds. Never set in CI.
 #   make build DEBUG_WIFI_SSID=IoToI DEBUG_WIFI_PASS=54383845

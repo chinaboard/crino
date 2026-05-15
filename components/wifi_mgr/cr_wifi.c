@@ -14,14 +14,20 @@
 
 #include "cr_config.h"
 #include "cr_captive.h"
+#include "cr_util.h"
 #include "mdns.h"
 
-static const char *TAG = "wifi";
+static const char *TAG = "wifi_mgr";  // distinct from IDF's "wifi" TAG so
+                                       // chassis logs (SoftAP up, STA target,
+                                       // mDNS up, etc.) survive the
+                                       // esp_log_level_set("wifi", WARN) we
+                                       // do in main to silence the IDF stack.
 
-// SoftAP SSID is `crino-setup-XXXX` where XXXX is the last 2 bytes of the
+// SoftAP SSID is `<prefix>-setup-XXXX` where XXXX is the last 2 bytes of the
 // chip's WiFi STA MAC, computed once at start_softap() time. Keeps multiple
 // devices in setup mode distinguishable to a phone scanning nearby APs.
-#define AP_SSID_PREFIX  "crino-setup-"
+// `<prefix>` follows CR_HOSTNAME_PREFIX (default "crino"; downstream apps
+// override at build time via the HOSTNAME_PREFIX make variable).
 #define AP_SSID_MAX     32       // WiFi SSID hard limit
 #define AP_CHANNEL      6
 #define AP_MAX_CONN     4
@@ -55,8 +61,8 @@ static void mdns_bring_up(void)
     }
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    char host[24];
-    snprintf(host, sizeof(host), "crino-%02x%02x", mac[4], mac[5]);
+    char host[32];
+    cr_chassis_hostname(host, sizeof(host));
     mdns_hostname_set(host);
 
     char name[CR_DEVICE_NAME_MAX] = {0};
@@ -200,17 +206,17 @@ static esp_err_t start_softap(void)
     // STA netif also created so esp_wifi_scan_start can run while AP is up.
     s_netif_sta = esp_netif_create_default_wifi_sta();
 
-    // Build per-device SSID `crino-setup-XXXX` (or `crino-rec-XXXX` in
-    // recovery mode) from the WiFi STA MAC last 2 bytes — one identifier
+    // Build per-device SSID `<prefix>-setup-XXXX` (or `<prefix>-rec-XXXX`
+    // in recovery mode) from the WiFi STA MAC last 2 bytes — one identifier
     // per physical device, stable across the device's lifetime.
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char ssid[AP_SSID_MAX];
-    const char *prefix = cr_metrics_in_recovery_mode()
-        ? "crino-rec-"   // boot-loop recovery — visible at a glance
-        : AP_SSID_PREFIX;
-    int slen = snprintf(ssid, sizeof(ssid), "%s%02X%02X",
-                        prefix, mac[4], mac[5]);
+    const char *suffix = cr_metrics_in_recovery_mode()
+        ? "-rec-"   // boot-loop recovery — visible at a glance
+        : "-setup-";
+    int slen = snprintf(ssid, sizeof(ssid), "%s%s%02X%02X",
+                        CR_HOSTNAME_PREFIX, suffix, mac[4], mac[5]);
 
     wifi_config_t cfg = {
         .ap = {
