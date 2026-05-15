@@ -88,7 +88,15 @@ DOCKER_TTY = docker run --rm -it -v $(PWD):/project -w /project \
 #   make build BOARD=supermini-c3                              # OFF (was sticky)
 EXTRA_CMAKE := -DEXTRA_COMPONENT_DIRS=$(EXTRA_COMPONENT_DIRS)
 
-.PHONY: build flash monitor flash-monitor erase clean fullclean menuconfig size shell
+.PHONY: build flash monitor flash-monitor erase clean fullclean menuconfig size shell boards
+
+boards:
+	@echo "Available boards (set BOARD=<name>):"
+	@for f in boards/*.mk; do \
+		name=$$(basename $$f .mk); \
+		first=$$(head -1 $$f | sed 's|^# *||'); \
+		printf "  %-18s %s\n" "$$name" "$$first"; \
+	done
 
 build:
 	$(DOCKER_RUN) idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(SDKCONFIG) $(EXTRA_CMAKE) reconfigure build
