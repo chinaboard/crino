@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
@@ -64,7 +65,25 @@ static void mdns_bring_up(void)
     } else {
         mdns_instance_name_set("Crino");
     }
-    mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+
+    // TXT records help service-discovery tools (Bonjour, avahi-browse, the
+    // dns-sd CLI) display useful info without an HTTP probe. Keep keys
+    // short and lowercase per RFC6763. Buffers must outlive the call —
+    // the mdns component copies them.
+    char mac_str[13];
+    snprintf(mac_str, sizeof(mac_str),
+             "%02x%02x%02x%02x%02x%02x",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    const esp_app_desc_t *desc = esp_app_get_description();
+    const char *fw = (desc && desc->version[0]) ? desc->version : "";
+    mdns_txt_item_t txt[] = {
+        { "fw",   (char *)fw },
+        { "mac",  mac_str    },
+        { "path", "/"        },
+    };
+    mdns_service_add(NULL, "_http", "_tcp", 80,
+                     txt, sizeof(txt) / sizeof(txt[0]));
+
     s_mdns_started = true;
     ESP_LOGI(TAG, "mDNS up: http://%s.local", host);
 }
