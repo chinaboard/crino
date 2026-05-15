@@ -375,6 +375,7 @@ const I18N = {
     'system.wifi_label':'WiFi network',
     'system.wifi_desc':'Saved SSID: <span class=mono>{0}</span>. Save new credentials and the device restarts to join the new SSID.',
     'system.wifi_ssid':'SSID', 'system.wifi_pass':'Password',
+    'system.wifi_pass_keep':'Leave empty to keep existing',
     'system.wifi_save':'Save & restart',
     'system.wifi_confirm':'Save WiFi credentials and restart? Device will be unreachable until it joins the new SSID.',
     'system.wifi_required':'SSID is required.',
@@ -489,6 +490,7 @@ const I18N = {
     'system.wifi_label':'WiFi 网络',
     'system.wifi_desc':'已保存的 SSID:<span class=mono>{0}</span>。保存新凭据后设备会自动重启并连接新的 WiFi。',
     'system.wifi_ssid':'SSID', 'system.wifi_pass':'密码',
+    'system.wifi_pass_keep':'留空表示保持原密码',
     'system.wifi_save':'保存并重启',
     'system.wifi_confirm':'保存 WiFi 凭据并重启?切换到新 SSID 之前设备将无法访问。',
     'system.wifi_required':'SSID 不能为空。',
@@ -881,7 +883,7 @@ function renderSystem(){
           </div>
           <div id=wifiScanRes class='t-mute' style='font-size:11px;margin-top:6px'></div>
         </label>
-        <label>${t('system.wifi_pass')}<input class=input id=wifiPass type=password maxlength=63 autocomplete=new-password></label>
+        <label>${t('system.wifi_pass')}<input class=input id=wifiPass type=password maxlength=63 autocomplete=new-password placeholder='${t('system.wifi_pass_keep')}'></label>
         <button class=btn id=wifiSaveB type=button style='align-self:flex-start'>${t('system.wifi_save')}</button>
       </form>
     </div>
@@ -1025,8 +1027,11 @@ function renderSystem(){
     const ssid=$('wifiSsid').value.trim();
     if(!ssid){alert(t('system.wifi_required'));return;}
     if(!confirm(t('system.wifi_confirm')))return;
+    // Empty password input = "keep existing"; the chassis treats a missing
+    // `password` key that way. Don't send "" or we'd blank the password.
     const pass=$('wifiPass').value;
-    const r=await fetch('/api/system/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid,password:pass})});
+    const body=pass===''?{ssid}:{ssid,password:pass};
+    const r=await fetch('/api/system/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(r.ok)waitForReboot();else alert(t('common.failed_prefix')+' '+await r.text());};
   // Reuse the wizard's scan-pick pattern so the user can tap a nearby SSID
   // instead of typing. WiFi scan in STA mode briefly disconnects from the

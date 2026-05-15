@@ -389,7 +389,27 @@ esp_err_t wifi_post(httpd_req_t *req)
         cJSON_Delete(j);
         return reply_text(req, "400 Bad Request", "ssid too long");
     }
-    const char *pwstr = cJSON_IsString(pass_j) ? pass_j->valuestring : "";
+
+    // Password handling:
+    //   field absent / null      → keep the existing password (user is
+    //                              moving to a different SSID with the same
+    //                              passphrase, or just renamed the AP)
+    //   field present, even ""   → use as-is (empty = open network)
+    // This matches the UI: an empty password input means "I didn't fill
+    // it in, leave it alone", not "I want to set the password to nothing".
+    char keep_pass[CR_WIFI_PASS_MAX] = {0};
+    const char *pwstr = NULL;
+    if (cJSON_IsString(pass_j)) {
+        pwstr = pass_j->valuestring;
+    } else {
+        char old_ssid[CR_WIFI_SSID_MAX] = {0};
+        if (cr_config_get_wifi(old_ssid, sizeof(old_ssid),
+                                keep_pass, sizeof(keep_pass)) == ESP_OK) {
+            pwstr = keep_pass;
+        } else {
+            pwstr = "";
+        }
+    }
     if (strlen(pwstr) >= CR_WIFI_PASS_MAX) {
         cJSON_Delete(j);
         return reply_text(req, "400 Bad Request", "password too long");
