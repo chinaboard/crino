@@ -11,6 +11,7 @@
 
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_app_desc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "cJSON.h"
@@ -154,10 +155,48 @@ esp_err_t require_auth(httpd_req_t *req)
 
 // ---------- root + favicon ----------
 
+// Build-time-stable ETag for the embedded Web UI: first 16 hex chars of the
+// app ELF SHA256 (esp_app_get_description gives us the raw 32 bytes). Same
+// across reboots of the same binary; changes the moment any source file
+// (including web/index.html) flips a byte. Lets the browser short-circuit
+// repeat downloads via If-None-Match → 304 Not Modified.
+static const char *web_ui_etag(void)
+{
+    static char etag[20] = "";  // "\"" + 16 hex chars + "\"" + NUL
+    if (etag[0]) return etag;
+    const esp_app_desc_t *d = esp_app_get_description();
+    if (!d) { strcpy(etag, "\"unknown\""); return etag; }
+    char hex[17];   // 8 bytes × 2 hex + NUL — exactly the bytes we use
+    for (int i = 0; i < 8; i++) {
+        snprintf(hex + i * 2, 3, "%02x", d->app_elf_sha256[i]);
+    }
+    snprintf(etag, sizeof(etag), "\"%.16s\"", hex);
+    return etag;
+}
+
 static esp_err_t root_get(httpd_req_t *req)
 {
+    const char *etag = web_ui_etag();
+
+    // 304 short-circuit: if the browser sent an If-None-Match matching our
+    // ETag, the gzip blob it has cached is still current — skip the body.
+    char inm[24];
+    if (httpd_req_get_hdr_value_str(req, "If-None-Match", inm, sizeof(inm)) == ESP_OK
+        && strcmp(inm, etag) == 0) {
+        httpd_resp_set_status(req, "304 Not Modified");
+        httpd_resp_set_hdr(req, "ETag", etag);
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    }
+
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    httpd_resp_set_hdr(req, "ETag", etag);
+    // Cache-Control: must-revalidate forces the browser to re-check the
+    // ETag on every load (no stale-while-revalidate). With no max-age it
+    // hits us on every refresh, but the response is just a 304 if the
+    // build hasn't changed — ~150 bytes vs ~25 KB.
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, must-revalidate");
     return httpd_resp_send(req, (const char *)INDEX_HTML_GZ_START,
                            INDEX_HTML_GZ_END - INDEX_HTML_GZ_START);
 }
