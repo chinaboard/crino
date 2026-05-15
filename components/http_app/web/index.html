@@ -873,7 +873,14 @@ function renderSystem(){
       <div class=ctitle>${t('system.wifi_label')}</div>
       <div class=cdesc id=wifiDesc>${t('system.wifi_desc','—')}</div>
       <form class=form id=wifiF autocomplete=off>
-        <label>${t('system.wifi_ssid')}<input class=input id=wifiSsid maxlength=31 autocomplete=off></label>
+        <label>${t('system.wifi_ssid')}
+          <div class=row style='gap:6px'>
+            <input class=input id=wifiSsid list=wifiSsidList maxlength=31 autocomplete=off style='flex:1'>
+            <datalist id=wifiSsidList></datalist>
+            <button type=button class='btn ghost sm' id=wifiScanB title='${t('setup.wifi_scan')}'>↻</button>
+          </div>
+          <div id=wifiScanRes class='t-mute' style='font-size:11px;margin-top:6px'></div>
+        </label>
         <label>${t('system.wifi_pass')}<input class=input id=wifiPass type=password maxlength=63 autocomplete=new-password></label>
         <button class=btn id=wifiSaveB type=button style='align-self:flex-start'>${t('system.wifi_save')}</button>
       </form>
@@ -1021,6 +1028,36 @@ function renderSystem(){
     const pass=$('wifiPass').value;
     const r=await fetch('/api/system/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid,password:pass})});
     if(r.ok)waitForReboot();else alert(t('common.failed_prefix')+' '+await r.text());};
+  // Reuse the wizard's scan-pick pattern so the user can tap a nearby SSID
+  // instead of typing. WiFi scan in STA mode briefly disconnects from the
+  // current AP — acceptable here since the user is about to switch anyway.
+  $('wifiScanB').onclick=async()=>{
+    const btn=$('wifiScanB'),box=$('wifiScanRes'),dl=$('wifiSsidList');
+    btn.disabled=true; const old=btn.textContent; btn.textContent='…';
+    box.textContent=t('setup.wifi_scanning');
+    try{
+      const r=await fetch('/api/wifi/scan');
+      if(!r.ok){box.textContent=t('setup.wifi_scan_fail');return;}
+      const d=await r.json();
+      const seen=new Set(); const aps=[];
+      for(const a of (d.aps||[])){
+        if(!a.ssid || seen.has(a.ssid))continue;
+        seen.add(a.ssid); aps.push(a);
+      }
+      aps.sort((a,b)=>(b.rssi||-999)-(a.rssi||-999));
+      dl.innerHTML=aps.map(a=>`<option value='${escAttr(a.ssid)}'>`).join('');
+      if(aps.length===0){box.textContent=t('setup.wifi_no_aps');return;}
+      box.innerHTML=aps.slice(0,12).map(a=>{
+        const lock=a.secure?' <span class=t-mute>·</span> 🔒':'';
+        return `<span class=ssidchip data-ssid='${escAttr(a.ssid)}'>${escAttr(a.ssid)} <span class=t-mute>${a.rssi}dBm${lock}</span></span>`;
+      }).join('');
+      box.querySelectorAll('.ssidchip').forEach(c=>c.onclick=()=>{
+        $('wifiSsid').value=c.dataset.ssid;
+        $('wifiPass').focus();
+      });
+    }catch(_){box.textContent=t('setup.wifi_scan_fail');}
+    finally{btn.disabled=false; btn.textContent=old;}
+  };
   $('restartB').onclick=async()=>{if(!confirm(t('system.restart_confirm')))return;
     await fetch('/api/system/restart',{method:'POST'});waitForReboot();};
   $('factoryB').onclick=async()=>{

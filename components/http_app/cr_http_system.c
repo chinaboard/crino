@@ -50,12 +50,22 @@ static temperature_sensor_handle_t s_tsens = NULL;
 static float chip_temp_c(void)
 {
     if (!s_tsens) {
+        // Use a local handle until BOTH install and enable succeed —
+        // otherwise install-OK + enable-FAIL would leave s_tsens
+        // non-NULL but unusable, and the next call would skip the
+        // install block and call get_celsius on a disabled sensor.
+        temperature_sensor_handle_t h = NULL;
         temperature_sensor_config_t cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
-        if (temperature_sensor_install(&cfg, &s_tsens) != ESP_OK ||
-            temperature_sensor_enable(s_tsens) != ESP_OK) {
-            ESP_LOGW(TAG, "tsens install/enable failed");
+        if (temperature_sensor_install(&cfg, &h) != ESP_OK) {
+            ESP_LOGW(TAG, "tsens install failed");
             return 0.0f;
         }
+        if (temperature_sensor_enable(h) != ESP_OK) {
+            ESP_LOGW(TAG, "tsens enable failed");
+            temperature_sensor_uninstall(h);
+            return 0.0f;
+        }
+        s_tsens = h;
     }
     float t = 0.0f;
     temperature_sensor_get_celsius(s_tsens, &t);
@@ -1037,6 +1047,16 @@ esp_err_t setup_post(httpd_req_t *req)
 
 esp_err_t wifi_scan_get(httpd_req_t *req)
 {
+    // Wizard / recovery / no-wifi modes need this unauthed (the setup
+    // page calls it before the admin even exists). In NORMAL/STA mode
+    // require auth — an open scan endpoint here would let anyone on the
+    // LAN spam scans, which briefly disrupts the device's own STA
+    // association each time.
+    if (cr_config_boot_mode() == CR_BOOT_NORMAL &&
+        !cr_metrics_in_recovery_mode()) {
+        if (require_auth(req) != ESP_OK) return ESP_OK;
+    }
+
     wifi_scan_config_t scan_cfg = { 0 };
     esp_err_t err = esp_wifi_scan_start(&scan_cfg, true);
     if (err != ESP_OK) {
