@@ -350,6 +350,12 @@ const I18N = {
 
     'overview.title':'Overview',
     'overview.desc':'Device status and resources.',
+    'overview.net_label':'Network',
+    'overview.wifi_state':'WiFi',
+    'overview.ip':'IP address',
+    'overview.mdns':'mDNS host',
+    'overview.fw':'Firmware',
+    'overview.chip_temp':'Chip temperature',
     'overview.res_label':'Device resources',
     'overview.disk':'Disk (LittleFS)',
     'overview.ram_free':'RAM free',
@@ -465,6 +471,12 @@ const I18N = {
 
     'overview.title':'总览',
     'overview.desc':'设备状态与资源。',
+    'overview.net_label':'网络',
+    'overview.wifi_state':'WiFi',
+    'overview.ip':'IP 地址',
+    'overview.mdns':'mDNS 主机名',
+    'overview.fw':'固件',
+    'overview.chip_temp':'芯片温度',
     'overview.res_label':'设备资源',
     'overview.disk':'磁盘 (LittleFS)',
     'overview.ram_free':'剩余内存',
@@ -810,14 +822,34 @@ async function renderOverview(){
   $('main').innerHTML=`
     ${recoveryBanner()}
     <div class=ph><h1>${t('overview.title')}</h1><div class=desc>${t('overview.desc')}</div></div>
+    <div class=card><div class=ctitle>${t('overview.net_label')}</div><div id=netBox></div></div>
     <div class=card><div class=ctitle>${t('overview.res_label')}</div><div id=resBox></div></div>`;
   await loadOverview();
 }
 
 async function refreshOverviewLite(){
   const s=state.status||{};
-  const box=$('resBox');if(!box)return;
-  renderResBox(box,s);
+  const rb=$('resBox'),nb=$('netBox');
+  if(rb)renderResBox(rb,s);
+  if(nb)renderNetBox(nb,s);
+}
+
+function renderNetBox(box,s){
+  // mdns_host already includes the "crino-XXXX" prefix; tack on .local so
+  // the user can copy/paste straight into a browser. Chip temp may be 0
+  // if tsens install/enable failed at boot — show "—" in that case.
+  const temp=(typeof s.chip_temp_c==='number'&&s.chip_temp_c>0)
+              ? s.chip_temp_c.toFixed(1)+'°C' : '—';
+  const ip=s.ip||'-';
+  const mdns=s.mdns_host?(s.mdns_host+'.local'):'-';
+  box.innerHTML=`
+    <dl class=kv>
+      <dt>${t('overview.wifi_state')}</dt><dd class=mono>${s.wifi||'-'}</dd>
+      <dt>${t('overview.ip')}</dt><dd class=mono>${ip}</dd>
+      <dt>${t('overview.mdns')}</dt><dd class=mono>${mdns}</dd>
+      <dt>${t('overview.fw')}</dt><dd class=mono>v${s.version||'?'}</dd>
+      <dt>${t('overview.chip_temp')}</dt><dd class=mono>${temp}</dd>
+    </dl>`;
 }
 
 function renderResBox(box,s){
@@ -838,7 +870,8 @@ function renderResBox(box,s){
 
 async function loadOverview(){
   const s=state.status||{};
-  renderResBox($('resBox'),s);
+  if($('resBox'))renderResBox($('resBox'),s);
+  if($('netBox'))renderNetBox($('netBox'),s);
 }
 
 function renderSystem(){

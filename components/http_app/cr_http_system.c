@@ -809,7 +809,10 @@ esp_err_t diag_get(httpd_req_t *req)
         esp_read_mac(mac, ESP_MAC_WIFI_STA);
         cr_format_mac(mac, buf);
         cJSON_AddStringToObject(chip, "mac_wifi", buf);
-        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        // BT mac was being read as ESP_MAC_WIFI_STA — copy-paste bug; the
+        // diag UI then showed the same value for both rows. ESP_MAC_BT
+        // works on every chip in this build (C3/C6 both ship BLE).
+        esp_read_mac(mac, ESP_MAC_BT);
         cr_format_mac(mac, buf);
         cJSON_AddStringToObject(chip, "mac_bt", buf);
         char host[24];
