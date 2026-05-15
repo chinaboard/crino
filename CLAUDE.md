@@ -59,6 +59,7 @@ Other useful targets (all honor `BOARD=`):
 | `make clean`         | `idf.py fullclean` for the active build dir |
 | `make fullclean`     | nuke `build-*`, generated `sdkconfig.esp32*`, `managed_components`, `dependencies.lock` |
 | `make shell`         | drop into a bash shell inside the IDF Docker image |
+| `make boards`        | list known board presets (`boards/*.mk` with their first-line comment) |
 
 Build-time timezone (POSIX TZ string, baked in via `-DCR_TZ`, default
 `CST-8`):
