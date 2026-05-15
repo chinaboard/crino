@@ -37,6 +37,53 @@ the host with `espflash`. Two boards ship: `supermini-c3` (plain GPIO
 LED via PWM on GPIO8) and `supermini-c6` (WS2812 RGB on GPIO8). Add a
 new board by dropping `boards/<name>.mk` — no Makefile edit needed.
 
+Other useful targets (all honor `BOARD=`):
+
+| Target | What it does |
+|--------|--------------|
+| `make flash-monitor` | flash, then immediately attach the serial monitor |
+| `make size`          | image / DRAM / IRAM footprint, per ELF section |
+| `make menuconfig`    | interactive sdkconfig editor (writes `sdkconfig.esp32cN`) |
+| `make erase`         | wipe the flash chip (incl. NVS) — full factory state |
+| `make clean`         | `idf.py fullclean` for the active build dir |
+| `make fullclean`     | nuke `build-*`, generated `sdkconfig.esp32*`, `managed_components`, `dependencies.lock` |
+| `make shell`         | drop into a bash shell inside the IDF Docker image |
+
+Build-time timezone (POSIX TZ string, baked in via `-DCR_TZ`, default
+`CST-8`):
+
+```bash
+make build BOARD=supermini-c3 TZ=JST-9   # Japan
+make build BOARD=supermini-c3 TZ=EST5EDT # US East
+```
+
+A board file (`boards/<name>.mk`) is plain `KEY=VAL` (sourceable from
+both Make and bash) with these keys:
+
+```
+TARGET            c3 | c6 | esp32c3 | esp32c6  (short or canonical IDF form)
+LED_ENABLE        0 disables the LED component completely (chassis builds out)
+LED_KIND          1=WS2812 (RMT), 2=plain PWM
+LED_GPIO          GPIO number of the LED
+LED_BRIGHTNESS    0–100, baseline brightness
+BOOT_BUTTON_GPIO  GPIO of the active-low BOOT button, or -1 to disable the long-press task
+```
+
+## Apps in their own tree (`EXTRA_COMPONENT_DIRS`)
+
+A downstream app does not have to live under `components/`. Drop your
+component anywhere and point IDF at it:
+
+```bash
+make build BOARD=supermini-c3 EXTRA_COMPONENT_DIRS=../my-app/components
+```
+
+This is the supported "crino as a chassis dependency" pattern — the
+chassis tree stays clean, the app stays in its own repo. The smoketest
+under `tests/smoketest/` uses this pattern; see
+`tests/smoketest/README.md` for the working command + expected output
++ a manual cross-partition recovery test procedure.
+
 ## DEBUG_WIFI build-time bypass
 
 For dev boards, skip the SoftAP first-run wizard by baking creds in:
@@ -91,6 +138,43 @@ the boot-loop counter is at or above `CR_BOOT_LOOP_RECOVERY_THRESHOLD`
 entirely and forces SoftAP with SSID `crino-rec-XXXX` so the operator
 can OTA a working image back. Counter is cleared by the OTA-validate
 callback after 60s of healthy uptime.
+
+**Layer 3 — factory partition handoff:** `partitions.csv` reserves a
+1152 KB `factory` slot holding an immutable chassis image. OTA only
+ever targets `ota_0`/`ota_1`; the factory partition is read-only at
+runtime. When boot-loop recovery arms AND we're running from an OTA
+slot, `cr_recovery_handoff_to_factory()` (called from `app_main` right
+after the boot-loop counter trips) does
+`esp_ota_set_boot_partition(factory)` + `esp_restart()`. The bootloader
+honors that and the next boot comes up in the rescue chassis. From
+there the user uploads a fixed image via the Web UI; `/api/system/ota`
+clears the boot-loop counter on success and the chassis hands control
+back to the freshly-written `ota_0`. `make flash` writes the chassis
+to `factory` on first flash, so a freshly-flashed board is already in
+the rescue layout. The same handoff is also reachable manually via
+`/api/system/rollback {target:"factory"|"other_ota"}` (see "HTTP API
+quick reference" below).
+
+## HTTP API quick reference
+
+Everything under `/api/system/*` (except `/health` and `/metrics` which
+are unauthenticated and Prometheus-style) requires the admin session
+cookie. Notable endpoints beyond the obvious:
+
+- `GET /api/system/diag` — full diag JSON (firmware desc, chip + temp,
+  heap, fs, ota.slots[] with per-slot version + state + running/next
+  flags, reset_reason, restart_cause, lifetime metrics).
+- `GET /api/system/wifi` / `POST {ssid, password}` — admin-side
+  authenticated WiFi reconfigure. Persists to NVS + restarts. Use this
+  instead of factory-resetting just to change WiFi creds.
+- `POST /api/system/rollback {target}` — manual partition switch.
+  `target` is `"factory"` or `"other_ota"`. Use `"other_ota"` to
+  rollback past the 60s OTA-validate window when a new image looked
+  fine initially but turned bad later. Refuses if the alternate slot
+  has no valid image.
+- `POST /api/setup` — first-run wizard handler. Locked once admin AND
+  wifi are both present (returns 409). Recovery + NO_WIFI modes can
+  set/replace wifi creds without re-sending admin_password.
 
 ## Components
 
