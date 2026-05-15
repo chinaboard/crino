@@ -385,7 +385,7 @@ const I18N = {
     'system.wifi_ssid':'SSID', 'system.wifi_pass':'Password',
     'system.wifi_pass_keep':'Leave empty to keep existing',
     'system.wifi_save':'Save & restart',
-    'system.wifi_confirm':'Save WiFi credentials and restart? Device will be unreachable until it joins the new SSID.',
+    'system.wifi_confirm':'Save WiFi credentials and restart? After the device reboots into "{0}", reconnect your computer to that network and reload http://{1}.local',
     'system.wifi_required':'SSID is required.',
     'system.led_label':'Status LED',
     'system.led_toggle':'Enable status LED',
@@ -402,6 +402,7 @@ const I18N = {
     'system.ota_progress':'Uploading {0}% · {1} / {2} KB',
     'system.ota_net_err':'Network error',
     'system.ota_force_confirm':'Project name mismatch:\n{0}\n\nForce-flash anyway?',
+    'system.ota_magic_warn':'"{0}" doesn\'t look like an IDF app image (missing 0xE9 magic byte). Upload anyway?',
     'system.backup_label':'Backup',
     'system.backup_note':'Backup contains the WiFi password and admin password hash — keep it secure. To restore: factory reset, then upload the backup on the first-run setup screen.',
     'system.download_backup':'Download backup JSON',
@@ -509,7 +510,7 @@ const I18N = {
     'system.wifi_ssid':'SSID', 'system.wifi_pass':'密码',
     'system.wifi_pass_keep':'留空表示保持原密码',
     'system.wifi_save':'保存并重启',
-    'system.wifi_confirm':'保存 WiFi 凭据并重启?切换到新 SSID 之前设备将无法访问。',
+    'system.wifi_confirm':'保存 WiFi 凭据并重启?设备重启后会连接 "{0}",请把电脑也连上该网络,然后重新打开 http://{1}.local',
     'system.wifi_required':'SSID 不能为空。',
     'system.led_label':'状态 LED',
     'system.led_toggle':'启用状态 LED',
@@ -526,6 +527,7 @@ const I18N = {
     'system.ota_progress':'上传中 {0}% · {1} / {2} KB',
     'system.ota_net_err':'网络错误',
     'system.ota_force_confirm':'project_name 不一致:\n{0}\n\n强制烧录吗?',
+    'system.ota_magic_warn':'"{0}" 不像 IDF app 镜像 (缺少 0xE9 魔术字节)。仍然上传吗?',
     'system.backup_label':'备份',
     'system.backup_note':'备份包含 WiFi 密码与管理员密码哈希,请妥善保管。要恢复:先恢复出厂,然后在 first-run setup 页面上传备份文件。',
     'system.download_backup':'下载备份 JSON',
@@ -1093,7 +1095,8 @@ function renderSystem(){
   $('wifiSaveB').onclick=async()=>{
     const ssid=$('wifiSsid').value.trim();
     if(!ssid){alert(t('system.wifi_required'));return;}
-    if(!confirm(t('system.wifi_confirm')))return;
+    const host=state.status?.mdns_host||'crino-XXXX';
+    if(!confirm(t('system.wifi_confirm',ssid,host)))return;
     // Empty password input = "keep existing"; the chassis treats a missing
     // `password` key that way. Don't send "" or we'd blank the password.
     const pass=$('wifiPass').value;
@@ -1138,6 +1141,18 @@ function renderSystem(){
     if(r.ok)waitForReboot();else alert(t('common.failed_prefix')+' '+await r.text());};
   $('otaB').onclick=async()=>{
     const f=$('otaFile').files[0];if(!f){alert(t('system.pick_bin'));return;}
+    // Magic-byte sanity check: every IDF app image starts with 0xE9. Catches
+    // the obvious "wrong file picked" footgun (e.g. .elf vs .bin, or a JSON
+    // backup file) before we burn 10 seconds uploading it. Server-side
+    // esp_ota_end would refuse it too, but the local check saves the round
+    // trip. Falsy result still uploads — wrapped in confirm() so the user
+    // can override on a custom-built image with a different layout.
+    try{
+      const head=new Uint8Array(await f.slice(0,1).arrayBuffer());
+      if(head[0]!==0xE9){
+        if(!confirm(t('system.ota_magic_warn',f.name)))return;
+      }
+    }catch(_){/* FileReader unavailable on ancient browsers — fall through */}
     if(!confirm(t('system.ota_confirm',(f.size/1024).toFixed(0))))return;
     uploadOTA(f,false);
   };
