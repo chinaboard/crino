@@ -51,6 +51,24 @@ esp_err_t cr_config_set_device_name(const char *name);
 
 esp_err_t cr_config_factory_reset(void);
 
+// Weak app hook: invoked from inside cr_config_factory_reset() right
+// before the chassis namespaces are wiped. Apps that store state in
+// their own NVS namespaces, LittleFS files under /storage, BLE bond
+// keys, etc. should override this to wipe their own data — otherwise
+// app state survives a "factory reset" that the user expects to be
+// total. The chassis ships a no-op default.
+//
+// Example app implementation:
+//
+//     void cr_app_factory_reset(void) {
+//         nvs_handle_t h;
+//         if (nvs_open("myapp", NVS_READWRITE, &h) == ESP_OK) {
+//             nvs_erase_all(h); nvs_commit(h); nvs_close(h);
+//         }
+//         unlink("/storage/myapp_calibration.bin");
+//     }
+void cr_app_factory_reset(void);
+
 // Reliability counters persisted across reboots.
 typedef struct {
     uint32_t boot_count;       // increments at every boot

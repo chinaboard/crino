@@ -9,16 +9,21 @@ that any device-firmware project would otherwise have to write from
 scratch.
 
 Crino is **not** a finished firmware on its own — it boots, serves the
-chassis Web UI, and waits. Apps extend it through three weak symbols
-declared in `cr_http.h`:
+chassis Web UI, and waits. Apps extend it through four weak symbols:
 
-- `void cr_app_init(void)` — invoked from `app_main` after the chassis
-  is fully up. Apps initialize their own subsystems here.
-- `void cr_app_register_routes(httpd_handle_t)` — invoked late in
-  `cr_http_start()`. Apps add their HTTP routes alongside the chassis
-  routes.
-- `bool cr_app_led_busy(void)` — return true to make the on-board LED
-  show the BUSY state. Optional.
+- `void cr_app_init(void)` (declared in `cr_http.h`) — invoked from
+  `app_main` after the chassis is fully up. Apps initialize their own
+  subsystems here.
+- `void cr_app_register_routes(httpd_handle_t)` (declared in `cr_http.h`)
+  — invoked late in `cr_http_start()`. Apps add their HTTP routes
+  alongside the chassis routes.
+- `bool cr_app_led_busy(void)` (declared in `cr_led.h`) — return true
+  to make the on-board LED show the BUSY state. Optional.
+- `void cr_app_factory_reset(void)` (declared in `cr_config.h`) —
+  invoked from `cr_config_factory_reset()` right before the chassis
+  NVS namespaces are wiped. Apps that store state in their own NVS
+  namespaces or under `/storage` should override this so a "factory
+  reset" actually wipes everything the user expects.
 
 Default no-op implementations live where each hook is invoked, so a
 bare crino build (no app) flashes and runs as the chassis-only

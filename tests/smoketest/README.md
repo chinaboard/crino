@@ -1,10 +1,10 @@
 # Smoketest — verify chassis weak-symbol app hooks
 
-A tiny app that overrides all three crino extension hooks
-(`cr_app_init`, `cr_app_register_routes`, `cr_app_led_busy`) with
-strong definitions. If the chassis correctly defers to strong app
-overrides at link time, flashing this build produces three visible
-effects you can check from a fresh boot:
+A tiny app that overrides all four crino extension hooks
+(`cr_app_init`, `cr_app_register_routes`, `cr_app_led_busy`,
+`cr_app_factory_reset`) with strong definitions. If the chassis
+correctly defers to strong app overrides at link time, flashing this
+build produces these visible effects you can check from a fresh boot:
 
 1. Serial log line `===== smoketest cr_app_init() invoked =====`
    appearing after the chassis init order finishes.
@@ -15,6 +15,10 @@ effects you can check from a fresh boot:
 3. The status LED stays on the BUSY state (cyan fast-blink on RGB
    boards, DUTY_BLINK on PWM boards) for the first 30 s of uptime,
    then drops back to the normal chassis state (OK / AP / etc.).
+4. Triggering a factory reset (`POST /api/system/factory_reset` with
+   `{"confirm":"FACTORY_RESET"}`, or 5-second BOOT-button hold)
+   prints `===== smoketest cr_app_factory_reset() invoked =====`
+   on the serial right before the chassis NVS namespaces get wiped.
 
 If none of those show up: the strong overrides didn't beat the
 chassis weak defaults. Most common cause is the linker didn't pull

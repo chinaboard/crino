@@ -90,9 +90,10 @@ goes straight into the .bin. Use only for your own dev boards.
 
 ## Extending crino — app hooks
 
-Three weak symbols in the chassis let an app extend without forking:
+Four weak symbols in the chassis let an app extend without forking:
 
 ```c
+#include "cr_config.h"
 #include "cr_http.h"
 #include "cr_led.h"
 
@@ -114,6 +115,17 @@ void cr_app_init(void) {
 //    pairing windows, OTA upload progress, sensor calibration, etc.
 bool cr_app_led_busy(void) {
     return my_op_in_progress;
+}
+
+// 4. (Optional) Wipe app-side state on factory reset. The chassis only
+//    erases its own NVS namespaces; without this hook your app's NVS
+//    namespace and any /storage files survive a "factory reset".
+void cr_app_factory_reset(void) {
+    nvs_handle_t h;
+    if (nvs_open("myapp", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_all(h); nvs_commit(h); nvs_close(h);
+    }
+    unlink("/storage/myapp_calibration.bin");
 }
 ```
 

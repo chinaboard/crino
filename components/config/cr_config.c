@@ -266,13 +266,14 @@ const char *cr_boot_mode_str(cr_boot_mode_t m)
 
 esp_err_t cr_config_factory_reset(void)
 {
-    ESP_LOGW(TAG, "factory reset: erasing chassis NVS namespaces");
+    ESP_LOGW(TAG, "factory reset: invoking cr_app_factory_reset() then erasing chassis NVS namespaces");
+    // Give the app a chance to wipe its own state first — its hook may
+    // depend on chassis NVS being still readable (rare but possible).
+    cr_app_factory_reset();
     // Wipe every chassis namespace, not just "crino", so a forgotten
     // password reset also drops LED preference, NTP server choice, and
     // any other chassis-owned NVS state. Apps store their state in
-    // app-named namespaces; if a downstream app wants its data wiped on
-    // factory reset, it should add its own namespace to this list (and
-    // pull this function via the chassis API).
+    // app-named namespaces; apps wipe those via cr_app_factory_reset().
     static const char *NAMESPACES[] = { NS, "led", "time" };
     esp_err_t last_err = ESP_OK;
     for (size_t i = 0; i < sizeof(NAMESPACES) / sizeof(NAMESPACES[0]); i++) {
@@ -287,6 +288,8 @@ esp_err_t cr_config_factory_reset(void)
     }
     return last_err;
 }
+
+__attribute__((weak)) void cr_app_factory_reset(void) { }
 
 esp_err_t cr_config_get_device_name(char *out, size_t cap)
 {

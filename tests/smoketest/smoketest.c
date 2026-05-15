@@ -1,4 +1,4 @@
-// Smoke test for the three chassis weak-symbol app hooks. Defines a
+// Smoke test for the four chassis weak-symbol app hooks. Defines a
 // STRONG version of each hook that, if successfully overriding the
 // chassis weak default, will:
 //
@@ -11,6 +11,11 @@
 //      so we can verify the chassis LED actually picks up the override
 //      (LED stays on the BUSY state for 30s after boot, then drops
 //      back to OK/AP/etc.).
+//   4. Log a banner from cr_app_factory_reset() so we can verify it's
+//      invoked when the chassis processes a factory-reset request
+//      (boot button long-press, /api/system/factory_reset, recovery
+//      arming via /api/system/rollback). Triggered manually during
+//      the smoketest run.
 //
 // To use: build crino with this component compiled in (it's a normal
 // component, just exists in components/smoketest/). To remove for a
@@ -21,6 +26,7 @@
 #include "esp_timer.h"
 #include "esp_http_server.h"
 
+#include "cr_config.h"
 #include "cr_http.h"
 #include "cr_led.h"
 
@@ -60,4 +66,9 @@ bool cr_app_led_busy(void)
     // to false so the LED returns to its normal state.
     int64_t uptime_us = esp_timer_get_time();
     return uptime_us < (30LL * 1000 * 1000);
+}
+
+void cr_app_factory_reset(void)
+{
+    ESP_LOGW(TAG, "===== smoketest cr_app_factory_reset() invoked =====");
 }
