@@ -1153,12 +1153,21 @@ async function loadDiag(){
   //   factory  → button enabled iff a factory partition exists in the table
   //   other_ota → button enabled iff diag tells us there's a non-running OTA
   //               slot whose state isn't invalid/aborted/undefined.
+  // Also surface the destination version on the button label so the user
+  // doesn't blind-click into a year-old image.
   const slots=ota.slots||[];
-  const hasFactory=slots.some(s=>s.kind==='factory');
+  const factory=slots.find(s=>s.kind==='factory');
   const altOta=slots.find(s=>s.kind==='ota'&&!s.running&&
                               !['invalid','aborted','undefined'].includes(s.state));
-  if($('rollbackFactoryB'))$('rollbackFactoryB').disabled=!hasFactory;
-  if($('rollbackOtherB'))  $('rollbackOtherB').disabled=!altOta;
+  const fb=$('rollbackFactoryB'),ob=$('rollbackOtherB');
+  if(fb){
+    fb.disabled=!factory;
+    fb.textContent=t('system.rollback_factory')+(factory?.version?` · v${factory.version}`:'');
+  }
+  if(ob){
+    ob.disabled=!altOta;
+    ob.textContent=t('system.rollback_other')+(altOta?` · v${altOta.version||'?'} (${altOta.label})`:'');
+  }
 }
 
 async function loadLogs(){
