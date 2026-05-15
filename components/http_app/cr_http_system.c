@@ -665,6 +665,17 @@ esp_err_t backup_get(httpd_req_t *req)
         hex_encode_str(hash, CR_ADMIN_HASH_LEN, hex);
         cJSON_AddStringToObject(cfg, "admin_hash_hex", hex);
     }
+
+    // Surface settings the user explicitly customised so a restore
+    // brings the device back to the same shape — not just authenticatable.
+    char dev_name[CR_DEVICE_NAME_MAX] = {0};
+    if (cr_config_get_device_name(dev_name, sizeof(dev_name)) == ESP_OK &&
+        dev_name[0]) {
+        cJSON_AddStringToObject(cfg, "device_name", dev_name);
+    }
+    const char *ntp = cr_time_get_ntp_server();
+    if (ntp && ntp[0]) cJSON_AddStringToObject(cfg, "ntp_server", ntp);
+
     cJSON_AddItemToObject(root, "config", cfg);
 
     httpd_resp_set_hdr(req, "Content-Disposition",
@@ -694,6 +705,8 @@ esp_err_t restore_post(httpd_req_t *req)
         const cJSON *pass_j = cJSON_GetObjectItem(cfg, "wifi_pass");
         const cJSON *salt_j = cJSON_GetObjectItem(cfg, "admin_salt_hex");
         const cJSON *hash_j = cJSON_GetObjectItem(cfg, "admin_hash_hex");
+        const cJSON *name_j = cJSON_GetObjectItem(cfg, "device_name");
+        const cJSON *ntp_j  = cJSON_GetObjectItem(cfg, "ntp_server");
 
         if (cJSON_IsString(ssid_j)) {
             cr_config_set_wifi(ssid_j->valuestring,
@@ -706,6 +719,14 @@ esp_err_t restore_post(httpd_req_t *req)
                 hex_decode(hash_j->valuestring, hash, sizeof(hash)) == CR_ADMIN_HASH_LEN) {
                 cr_config_set_admin_blob(salt, hash);
             }
+        }
+
+        if (cJSON_IsString(name_j) && name_j->valuestring[0] &&
+            strlen(name_j->valuestring) < CR_DEVICE_NAME_MAX) {
+            cr_config_set_device_name(name_j->valuestring);
+        }
+        if (cJSON_IsString(ntp_j) && ntp_j->valuestring[0]) {
+            cr_time_set_ntp_server(ntp_j->valuestring);
         }
     }
 

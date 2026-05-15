@@ -41,7 +41,10 @@ static bool s_mdns_started = false;
 // Bring up mDNS so the device is reachable via http://crino-XXXX.local
 // from any modern OS, no router-DHCP-table hunting needed. Idempotent —
 // safe across STA reconnects. Hostname derives from the WiFi STA MAC so
-// it's stable across the device's lifetime.
+// it's stable across the device's lifetime; the human-friendly instance
+// name follows the user-set device_name (falls back to "Crino" so the
+// chassis is recognisable in Bonjour browsers before the user has named
+// anything).
 static void mdns_bring_up(void)
 {
     if (s_mdns_started) return;
@@ -54,7 +57,13 @@ static void mdns_bring_up(void)
     char host[24];
     snprintf(host, sizeof(host), "crino-%02x%02x", mac[4], mac[5]);
     mdns_hostname_set(host);
-    mdns_instance_name_set("Crino");
+
+    char name[CR_DEVICE_NAME_MAX] = {0};
+    if (cr_config_get_device_name(name, sizeof(name)) == ESP_OK && name[0]) {
+        mdns_instance_name_set(name);
+    } else {
+        mdns_instance_name_set("Crino");
+    }
     mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
     s_mdns_started = true;
     ESP_LOGI(TAG, "mDNS up: http://%s.local", host);
