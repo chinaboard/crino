@@ -360,6 +360,7 @@ const I18N = {
     'overview.disk':'Disk (LittleFS)',
     'overview.ram_free':'RAM free',
     'overview.uptime':'Uptime',
+    'overview.restart_cause':'Last restart cause',
     'overview.device_name':'Device name',
 
     'system.title':'System',
@@ -482,6 +483,7 @@ const I18N = {
     'overview.disk':'磁盘 (LittleFS)',
     'overview.ram_free':'剩余内存',
     'overview.uptime':'运行时长',
+    'overview.restart_cause':'上次重启原因',
     'overview.device_name':'设备名',
 
     'system.title':'系统',
@@ -858,6 +860,12 @@ function renderResBox(box,s){
   const used=s.fs_used||0,total=s.fs_total||1;
   const pct=Math.round(used*100/total);
   const barCls=pct>90?' full':(pct>70?' warn':'');
+  // Hide the restart-cause row when the cause is "unknown" — that's the
+  // post-power-on default and adds visual noise. Anything else (ota /
+  // admin / heap_critical / boot_loop_recovery) is genuinely useful.
+  const cause=s.restart_cause;
+  const causeRow=(cause&&cause!=='unknown')
+      ? `<dt>${t('overview.restart_cause')}</dt><dd class=mono>${cause}</dd>` : '';
   box.innerHTML=`
     <dl class=kv>
       <dt>${t('overview.disk')}</dt><dd class=mono>${fmtBytes(used)} / ${fmtBytes(total)} (${pct}%)</dd>
@@ -866,6 +874,7 @@ function renderResBox(box,s){
     <dl class=kv style='margin-top:14px'>
       <dt>${t('overview.ram_free')}</dt><dd class=mono>${fmtBytes(s.heap_free)}</dd>
       <dt>${t('overview.uptime')}</dt><dd class=mono>${fmtDur(s.uptime_s)}</dd>
+      ${causeRow}
       <dt>${t('overview.device_name')}</dt><dd class=mono>${s.device_name||'-'}</dd>
     </dl>`;
 }

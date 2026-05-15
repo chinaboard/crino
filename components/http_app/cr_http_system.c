@@ -149,6 +149,13 @@ esp_err_t status_get(httpd_req_t *req)
     cJSON_AddNumberToObject(j, "uptime_s", esp_timer_get_time() / 1000000);
     cJSON_AddNumberToObject(j, "heap_free", (double)esp_get_free_heap_size());
     cJSON_AddNumberToObject(j, "chip_temp_c", chip_temp_c());
+    // Reason for the previous reboot — useful on the Overview tab so the
+    // user knows whether the device came back from a clean restart, an
+    // OTA, a panic loop into recovery, etc. Same value as in /diag; not
+    // sensitive (the strings are mundane: ota / admin / heap_critical /
+    // boot_loop_recovery / unknown).
+    cJSON_AddStringToObject(j, "restart_cause",
+                             cr_restart_cause_str(cr_metrics_get_last_cause()));
 
     // mDNS hostname so the UI (and the setup-saved screen) can show users
     // a stable URL for after-reboot access. WiFi-MAC-derived; doesn't
