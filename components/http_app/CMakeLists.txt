@@ -4,8 +4,8 @@ idf_component_register(
     INCLUDE_DIRS "include"
     REQUIRES esp_http_server esp_timer esp_wifi esp_system log
              config wifi_mgr session storage time_sync led log_buf util
-             esp_driver_tsens
-    PRIV_REQUIRES cjson esp_app_format app_update
+             esp_driver_tsens cjson
+    PRIV_REQUIRES esp_app_format app_update
 )
 
 # Web UI is gzipped at build time and embedded as a binary blob. Saves ~20 KB

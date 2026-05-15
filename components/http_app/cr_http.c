@@ -265,3 +265,9 @@ __attribute__((weak)) void cr_app_register_routes(httpd_handle_t server)
 {
     (void)server;
 }
+
+// Weak default — apps override to inject fields into /api/system/status.
+__attribute__((weak)) void cr_app_status_json(cJSON *root)
+{
+    (void)root;
+}

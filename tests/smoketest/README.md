@@ -1,10 +1,11 @@
 # Smoketest — verify chassis weak-symbol app hooks
 
-A tiny app that overrides all four crino extension hooks
+A tiny app that overrides all five crino extension hooks
 (`cr_app_init`, `cr_app_register_routes`, `cr_app_led_busy`,
-`cr_app_factory_reset`) with strong definitions. If the chassis
-correctly defers to strong app overrides at link time, flashing this
-build produces these visible effects you can check from a fresh boot:
+`cr_app_factory_reset`, `cr_app_status_json`) with strong definitions.
+If the chassis correctly defers to strong app overrides at link time,
+flashing this build produces these visible effects you can check from
+a fresh boot:
 
 1. Serial log line `===== smoketest cr_app_init() invoked =====`
    appearing after the chassis init order finishes.
@@ -19,6 +20,8 @@ build produces these visible effects you can check from a fresh boot:
    `{"confirm":"FACTORY_RESET"}`, or 5-second BOOT-button hold)
    prints `===== smoketest cr_app_factory_reset() invoked =====`
    on the serial right before the chassis NVS namespaces get wiped.
+5. `curl http://crino-XXXX.local/api/system/status` includes a
+   `smoketest_uptime_us` field — proves `cr_app_status_json()` ran.
 
 If none of those show up: the strong overrides didn't beat the
 chassis weak defaults. Most common cause is the linker didn't pull

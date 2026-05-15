@@ -9,7 +9,7 @@ that any device-firmware project would otherwise have to write from
 scratch.
 
 Crino is **not** a finished firmware on its own — it boots, serves the
-chassis Web UI, and waits. Apps extend it through four weak symbols:
+chassis Web UI, and waits. Apps extend it through five weak symbols:
 
 - `void cr_app_init(void)` (declared in `cr_http.h`) — invoked from
   `app_main` after the chassis is fully up. Apps initialize their own
@@ -24,6 +24,12 @@ chassis Web UI, and waits. Apps extend it through four weak symbols:
   NVS namespaces are wiped. Apps that store state in their own NVS
   namespaces or under `/storage` should override this so a "factory
   reset" actually wipes everything the user expects.
+- `void cr_app_status_json(cJSON *root)` (declared in `cr_http.h`) —
+  invoked from inside the `/api/system/status` handler with the
+  cJSON object that's about to be returned. Apps inject their own
+  fields so the public status payload (which the Web UI's Overview
+  tab polls every 5 s) carries app-side state without needing a
+  separate `/api/app/status` route. Keep additions small.
 
 Default no-op implementations live where each hook is invoked, so a
 bare crino build (no app) flashes and runs as the chassis-only

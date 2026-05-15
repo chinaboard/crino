@@ -1,4 +1,4 @@
-// Smoke test for the four chassis weak-symbol app hooks. Defines a
+// Smoke test for the five chassis weak-symbol app hooks. Defines a
 // STRONG version of each hook that, if successfully overriding the
 // chassis weak default, will:
 //
@@ -16,6 +16,9 @@
 //      (boot button long-press, /api/system/factory_reset, recovery
 //      arming via /api/system/rollback). Triggered manually during
 //      the smoketest run.
+//   5. Inject `smoketest_uptime_us` into /api/system/status via
+//      cr_app_status_json() — `curl /api/system/status` should show
+//      that field, proving the hook fires.
 //
 // To use: build crino with this component compiled in (it's a normal
 // component, just exists in components/smoketest/). To remove for a
@@ -25,6 +28,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_http_server.h"
+#include "cJSON.h"
 
 #include "cr_config.h"
 #include "cr_http.h"
@@ -71,4 +75,10 @@ bool cr_app_led_busy(void)
 void cr_app_factory_reset(void)
 {
     ESP_LOGW(TAG, "===== smoketest cr_app_factory_reset() invoked =====");
+}
+
+void cr_app_status_json(cJSON *root)
+{
+    cJSON_AddNumberToObject(root, "smoketest_uptime_us",
+                            (double)esp_timer_get_time());
 }

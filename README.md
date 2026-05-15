@@ -90,7 +90,7 @@ goes straight into the .bin. Use only for your own dev boards.
 
 ## Extending crino — app hooks
 
-Four weak symbols in the chassis let an app extend without forking:
+Five weak symbols in the chassis let an app extend without forking:
 
 ```c
 #include "cr_config.h"
@@ -126,6 +126,14 @@ void cr_app_factory_reset(void) {
         nvs_erase_all(h); nvs_commit(h); nvs_close(h);
     }
     unlink("/storage/myapp_calibration.bin");
+}
+
+// 5. (Optional) Inject app-side fields into /api/system/status. Useful for
+//    things the Overview tab should refresh every 5 s without polling a
+//    second endpoint — sensor readings, queue depth, "session active" flag.
+void cr_app_status_json(cJSON *root) {
+    cJSON_AddNumberToObject(root, "app_temp_c", read_sensor());
+    cJSON_AddBoolToObject(root, "app_session_active", g_session);
 }
 ```
 

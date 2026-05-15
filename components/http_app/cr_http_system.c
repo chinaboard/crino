@@ -21,6 +21,7 @@
 #include "freertos/task.h"
 
 #include "cr_config.h"
+#include "cr_http.h"
 #include "cr_session.h"
 #include "cr_led.h"
 #include "cr_log.h"
@@ -187,6 +188,11 @@ esp_err_t status_get(httpd_req_t *req)
             cJSON_AddNumberToObject(j, "wifi_channel", ap.primary);
         }
     }
+
+    // App extension hook: let downstream apps inject their own fields
+    // into the public status payload without needing a separate route.
+    // Default no-op weak symbol in cr_http.c — apps override.
+    cr_app_status_json(j);
     // Reason for the previous reboot — useful on the Overview tab so the
     // user knows whether the device came back from a clean restart, an
     // OTA, a panic loop into recovery, etc. Same value as in /diag; not

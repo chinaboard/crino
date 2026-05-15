@@ -2,6 +2,7 @@
 
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include "cJSON.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +33,23 @@ void cr_app_register_routes(httpd_handle_t server);
 // Apps put their own initialization here — sensor drivers, BLE init,
 // custom timers, etc. The chassis ships a weak no-op default.
 void cr_app_init(void);
+
+// App extension hook: invoked from inside the chassis /api/system/status
+// handler with the cJSON object that's about to be returned. Apps add
+// their own fields to it so the public status payload (which the Web
+// UI's Overview tab polls every 5 s) carries app-side state without
+// needing a separate /api/app/status route. Useful for things like a
+// sensor's last reading, a queue depth, a "session active" flag, etc.
+//
+// Keep what you add small — /status fires every 5 s on every authed
+// browser tab.
+//
+// Example:
+//     void cr_app_status_json(cJSON *root) {
+//         cJSON_AddNumberToObject(root, "app_temp_c", read_sensor());
+//         cJSON_AddBoolToObject(root, "app_session_active", g_session);
+//     }
+void cr_app_status_json(cJSON *root);
 
 #ifdef __cplusplus
 }
