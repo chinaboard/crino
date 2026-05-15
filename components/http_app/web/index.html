@@ -664,9 +664,21 @@ async function init(){
   await refreshStatus();
   await refreshAuth();
   render();
-  setInterval(async()=>{await refreshStatus();
+  // Background status poll. Skip while the tab is hidden — saves both the
+  // browser's own bandwidth and the device's HTTP cycles when nobody's
+  // looking. visibilitychange also kicks an immediate refresh on return so
+  // the user doesn't see a stale 5s window when they tab back.
+  setInterval(async()=>{
+    if(document.hidden)return;
+    await refreshStatus();
     if(state.view==='overview'&&state.authed)refreshOverviewLite();
   },5000);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)return;
+    refreshStatus().then(()=>{
+      if(state.view==='overview'&&state.authed)refreshOverviewLite();
+    });
+  });
 }
 
 function render(){
