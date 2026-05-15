@@ -353,6 +353,7 @@ const I18N = {
     'overview.net_label':'Network',
     'overview.wifi_state':'WiFi',
     'overview.ip':'IP address',
+    'overview.signal':'Signal',
     'overview.mdns':'mDNS host',
     'overview.fw':'Firmware',
     'overview.chip_temp':'Chip temperature',
@@ -476,6 +477,7 @@ const I18N = {
     'overview.net_label':'网络',
     'overview.wifi_state':'WiFi',
     'overview.ip':'IP 地址',
+    'overview.signal':'信号',
     'overview.mdns':'mDNS 主机名',
     'overview.fw':'固件',
     'overview.chip_temp':'芯片温度',
@@ -858,10 +860,15 @@ function renderNetBox(box,s){
               ? s.chip_temp_c.toFixed(1)+'°C' : '—';
   const ip=s.ip||'-';
   const mdns=s.mdns_host?(s.mdns_host+'.local'):'-';
+  // Signal strength only present in STA mode and when sta_get_ap_info
+  // succeeded. Render as "ssid · -47dBm · ch6" so it's all-in-one.
+  const sigRow=(typeof s.wifi_rssi==='number')
+      ? `<dt>${t('overview.signal')}</dt><dd class=mono>${s.wifi_ssid||'-'} · ${s.wifi_rssi}dBm · ch${s.wifi_channel||'?'}</dd>` : '';
   box.innerHTML=`
     <dl class=kv>
       <dt>${t('overview.wifi_state')}</dt><dd class=mono>${s.wifi||'-'}</dd>
       <dt>${t('overview.ip')}</dt><dd class=mono>${ip}</dd>
+      ${sigRow}
       <dt>${t('overview.mdns')}</dt><dd class=mono>${mdns}</dd>
       <dt>${t('overview.fw')}</dt><dd class=mono>v${s.version||'?'}</dd>
       <dt>${t('overview.chip_temp')}</dt><dd class=mono>${temp}</dd>

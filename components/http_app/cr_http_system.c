@@ -149,6 +149,19 @@ esp_err_t status_get(httpd_req_t *req)
     cJSON_AddNumberToObject(j, "uptime_s", esp_timer_get_time() / 1000000);
     cJSON_AddNumberToObject(j, "heap_free", (double)esp_get_free_heap_size());
     cJSON_AddNumberToObject(j, "chip_temp_c", chip_temp_c());
+
+    // STA-only diagnostic: AP-side metadata + signal strength so users
+    // can see what they're connected to and how strong the signal is.
+    // wifi_ap_record_t is small (~100 bytes); the get-call returns a
+    // non-OK error when not associated, so we just skip the fields then.
+    if (cr_wifi_state() == CR_WIFI_STATE_STA_GOT_IP) {
+        wifi_ap_record_t ap;
+        if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
+            cJSON_AddStringToObject(j, "wifi_ssid", (const char *)ap.ssid);
+            cJSON_AddNumberToObject(j, "wifi_rssi", ap.rssi);
+            cJSON_AddNumberToObject(j, "wifi_channel", ap.primary);
+        }
+    }
     // Reason for the previous reboot — useful on the Overview tab so the
     // user knows whether the device came back from a clean restart, an
     // OTA, a panic loop into recovery, etc. Same value as in /diag; not

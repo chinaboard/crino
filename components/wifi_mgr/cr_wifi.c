@@ -168,7 +168,11 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
             esp_netif_get_ip_info(s_netif_ap, &ip);
             wifi_config_t wc;
             esp_wifi_get_config(WIFI_IF_AP, &wc);
-            ESP_LOGI(TAG, "SoftAP up: ssid=%s gw=" IPSTR, (char *)wc.ap.ssid, IP2STR(&ip.gw));
+            // WARN level so it lands in the user's serial monitor even
+            // when wifi-related logs get filtered down — first-run UX
+            // hinges on the user actually finding this address.
+            ESP_LOGW(TAG, "SoftAP up: SSID=%s — Web UI: http://" IPSTR,
+                     (char *)wc.ap.ssid, IP2STR(&ip.gw));
             // Captive portal: DNS hijack so phones auto-pop the setup page.
             cr_captive_start(ip.gw.addr);
             s_state = CR_WIFI_STATE_AP;
@@ -195,7 +199,14 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
         s_sta_down_since_us = 0;
         if (s_sta_giveup_timer) esp_timer_stop(s_sta_giveup_timer);
         s_state = CR_WIFI_STATE_STA_GOT_IP;
-        ESP_LOGI(TAG, "STA got IP: " IPSTR, IP2STR(&e->ip_info.ip));
+        // Print BOTH the IP and the mDNS hostname so a user reading the
+        // serial monitor knows exactly where to point a browser. Some
+        // networks block mDNS; some hosts lack mDNS resolvers — having
+        // the raw IP printed too means the user can copy whichever works.
+        char host[32];
+        cr_chassis_hostname(host, sizeof(host));
+        ESP_LOGW(TAG, "STA got IP: " IPSTR " — Web UI: http://" IPSTR " or http://%s.local",
+                 IP2STR(&e->ip_info.ip), IP2STR(&e->ip_info.ip), host);
         mdns_bring_up();
     }
 }
@@ -231,7 +242,9 @@ static esp_err_t start_softap(void)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_LOGI(TAG, "SoftAP up, SSID=%.*s", slen, ssid);
+    // (The richer "SoftAP up: SSID=... — Web UI: http://..." line is
+    // logged from the WIFI_EVENT_AP_START handler once the AP netif
+    // actually has its IP.)
     return ESP_OK;
 }
 
