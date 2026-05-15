@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -226,11 +228,85 @@ esp_err_t status_get(httpd_req_t *req)
 
 // ---------- auth ----------
 
+// Per-IP brute-force throttle for /api/auth/login. Bounded ring of 8 IPs;
+// 5 misses within 60s arms a 5-minute lockout for that IP. Successful
+// auth clears the IP's counters. Bounded so a flood-from-many-IPs attack
+// can't blow the heap — we just LRU-evict, the worst-case attacker still
+// faces the existing 800ms per-attempt sleep.
+
+#define LOGIN_FAIL_WINDOW_US   (60LL  * 1000 * 1000)
+#define LOGIN_LOCK_DURATION_US (300LL * 1000 * 1000)
+#define LOGIN_MAX_FAILS        5
+#define LOGIN_TRACK_SLOTS      8
+
+typedef struct {
+    uint32_t ip;             // 0 = empty slot
+    uint8_t  fails;
+    int64_t  first_fail_us;
+    int64_t  locked_until_us;
+} login_slot_t;
+
+static login_slot_t s_login_slots[LOGIN_TRACK_SLOTS];
+
+// Pull the IPv4 source address off the underlying socket. Returns 0 on any
+// failure — caller treats 0 as "unknown" and skips per-IP tracking
+// (defense-in-depth, not a strict gate). IPv4-only is fine: the chassis's
+// lwip config doesn't enable IPv6 by default.
+static uint32_t client_ipv4(httpd_req_t *req)
+{
+    int sock = httpd_req_to_sockfd(req);
+    if (sock < 0) return 0;
+    struct sockaddr_in sa;
+    socklen_t sl = sizeof(sa);
+    if (getpeername(sock, (struct sockaddr *)&sa, &sl) != 0) return 0;
+    if (sa.sin_family != AF_INET) return 0;
+    return sa.sin_addr.s_addr;
+}
+
+static login_slot_t *find_or_alloc_slot(uint32_t ip, int64_t now)
+{
+    if (!ip) return NULL;
+    login_slot_t *empty = NULL, *oldest = &s_login_slots[0];
+    for (int i = 0; i < LOGIN_TRACK_SLOTS; i++) {
+        login_slot_t *s = &s_login_slots[i];
+        if (s->ip == ip) return s;
+        if (s->ip == 0 && !empty) empty = s;
+        // LRU = whichever has the oldest first_fail_us OR locked_until_us
+        int64_t s_age   = s->locked_until_us > s->first_fail_us
+                                ? s->locked_until_us : s->first_fail_us;
+        int64_t old_age = oldest->locked_until_us > oldest->first_fail_us
+                                ? oldest->locked_until_us : oldest->first_fail_us;
+        if (s_age < old_age) oldest = s;
+    }
+    login_slot_t *s = empty ? empty : oldest;
+    s->ip = ip;
+    s->fails = 0;
+    s->first_fail_us = 0;
+    s->locked_until_us = 0;
+    (void)now;
+    return s;
+}
+
 esp_err_t auth_login_post(httpd_req_t *req)
 {
     if (!cr_config_has_admin()) {
         return reply_text(req, "409 Conflict", "no admin set; use /api/setup first");
     }
+
+    int64_t now = esp_timer_get_time();
+    uint32_t ip = client_ipv4(req);
+    login_slot_t *slot = find_or_alloc_slot(ip, now);
+
+    // Per-IP lockout pre-check — return 429 with how-long-to-wait so the
+    // UI can render a sensible message.
+    if (slot && slot->locked_until_us > now) {
+        int wait_s = (int)((slot->locked_until_us - now) / 1000000);
+        char msg[80];
+        snprintf(msg, sizeof(msg),
+                 "too many failed attempts; try again in %ds", wait_s);
+        return reply_text(req, "429 Too Many Requests", msg);
+    }
+
     cJSON *j = recv_json_body(req);
     if (!j) return reply_text(req, "400 Bad Request", "bad json");
     const cJSON *pw = cJSON_GetObjectItem(j, "password");
@@ -245,9 +321,36 @@ esp_err_t auth_login_post(httpd_req_t *req)
 
     if (err != ESP_OK) return reply_text(req, "500 Internal Server Error", "verify failed");
     if (!ok) {
-        // crude rate-limit: sleep on miss
+        // Per-IP failure accounting. Window resets if the previous miss
+        // was more than LOGIN_FAIL_WINDOW_US ago, so casual mistypes
+        // don't accumulate forever.
+        if (slot) {
+            if (slot->first_fail_us == 0 ||
+                now - slot->first_fail_us > LOGIN_FAIL_WINDOW_US) {
+                slot->fails = 1;
+                slot->first_fail_us = now;
+            } else {
+                slot->fails++;
+            }
+            if (slot->fails >= LOGIN_MAX_FAILS) {
+                slot->locked_until_us = now + LOGIN_LOCK_DURATION_US;
+                ESP_LOGW(TAG, "login: locked IP %u.%u.%u.%u for 5 min after %u fails",
+                         (ip >> 0) & 0xff, (ip >> 8) & 0xff,
+                         (ip >> 16) & 0xff, (ip >> 24) & 0xff,
+                         (unsigned)slot->fails);
+            }
+        }
+        // Crude per-call delay still helpful as a CPU floor on attackers.
         vTaskDelay(pdMS_TO_TICKS(800));
         return reply_text(req, "401 Unauthorized", "bad password");
+    }
+
+    // Success — clear this IP's miss state so the next session start
+    // doesn't carry over a stale lockout window.
+    if (slot) {
+        slot->fails = 0;
+        slot->first_fail_us = 0;
+        slot->locked_until_us = 0;
     }
 
     char tok[CR_SESSION_TOKEN_LEN];
