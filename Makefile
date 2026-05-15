@@ -82,10 +82,11 @@ DOCKER_TTY = docker run --rm -it -v $(PWD):/project -w /project \
 
 # EXTRA_COMPONENT_DIRS lets downstream apps live next to the chassis
 # without polluting components/. Pass it through to cmake explicitly —
-# the env var alone gets cached across `reconfigure` runs.
-ifneq ($(EXTRA_COMPONENT_DIRS),)
+# always, even when empty, so toggling the smoketest off doesn't leave
+# the previous value sitting in CMakeCache.txt:
+#   make build BOARD=supermini-c3 EXTRA_COMPONENT_DIRS=tests   # ON
+#   make build BOARD=supermini-c3                              # OFF (was sticky)
 EXTRA_CMAKE := -DEXTRA_COMPONENT_DIRS=$(EXTRA_COMPONENT_DIRS)
-endif
 
 .PHONY: build flash monitor flash-monitor erase clean fullclean menuconfig size shell
 
