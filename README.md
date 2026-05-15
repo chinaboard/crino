@@ -19,8 +19,9 @@ Chassis boots cleanly on ESP32-C3 / ESP32-C6:
 - Web UI: Overview tab (device resources) + System tab (LED / device name /
   NTP / OTA / backup / logs / restart / factory reset)
 
-Bare image is ~927 KB (about 60% of the 1.5 MB OTA slot), leaving ~620 KB
-of headroom for app code + ~131 KB free heap on ESP32-C3.
+Bare image is ~932 KB (about 81% of the 1152 KB factory partition),
+leaving ~220 KB of headroom for app code + ~131 KB free heap on
+ESP32-C3.
 
 ## Unbrickable recovery
 

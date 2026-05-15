@@ -363,6 +363,8 @@ const I18N = {
     'overview.uptime':'Uptime',
     'overview.restart_cause':'Last restart cause',
     'overview.device_name':'Device name',
+    'overview.copy_hint':'Click to copy device summary',
+    'overview.copied':'copied',
 
     'system.title':'System',
     'system.desc':'Diagnostics, device name, firmware update, backup, danger zone.',
@@ -488,6 +490,8 @@ const I18N = {
     'overview.uptime':'运行时长',
     'overview.restart_cause':'上次重启原因',
     'overview.device_name':'设备名',
+    'overview.copy_hint':'点击复制设备概要',
+    'overview.copied':'已复制',
 
     'system.title':'系统',
     'system.desc':'诊断信息、设备名、固件升级、备份与危险操作。',
@@ -847,8 +851,17 @@ async function renderOverview(){
     ${recoveryBanner()}
     <div class=ph><h1>${t('overview.title')}</h1><div class=desc>${t('overview.desc')}</div></div>
     <div class=card><div class=ctitle>${t('overview.net_label')}</div><div id=netBox></div></div>
-    <div class=card><div class=ctitle>${t('overview.res_label')}</div><div id=resBox></div></div>`;
+    <div class=card><div class=ctitle>${t('overview.res_label')}</div><div id=resBox></div></div>
+    <div class='mono t-mute' id=supportLine style='font-size:11px;text-align:center;margin-top:14px;cursor:copy' title='${t('overview.copy_hint')}'></div>`;
   await loadOverview();
+  // Click anywhere on the support line to copy it. One-line summary that
+  // a user can paste into a support thread without screenshots.
+  const sl=$('supportLine');
+  if(sl)sl.onclick=()=>{
+    navigator.clipboard?.writeText(sl.textContent).then(
+      ()=>{const old=sl.textContent;sl.textContent='✓ '+t('overview.copied');
+        setTimeout(()=>sl.textContent=old,1200);}, ()=>{});
+  };
 }
 
 async function refreshOverviewLite(){
@@ -908,6 +921,20 @@ async function loadOverview(){
   const s=state.status||{};
   if($('resBox'))renderResBox($('resBox'),s);
   if($('netBox'))renderNetBox($('netBox'),s);
+  // Support line: one-line copy-pasteable device summary so a user can
+  // share device + version + identity in a support thread without a
+  // screenshot. Fields all come from /status; pieces are skipped if
+  // missing so the line stays clean during the SoftAP first-run state.
+  const sl=$('supportLine');
+  if(sl){
+    const parts=[];
+    if(s.version)parts.push('v'+s.version);
+    if(s.mdns_host)parts.push(s.mdns_host);
+    if(s.ip&&s.ip!=='-')parts.push(s.ip);
+    if(typeof s.uptime_s==='number')parts.push('up '+fmtDur(s.uptime_s));
+    if(s.restart_cause&&s.restart_cause!=='unknown')parts.push('rst:'+s.restart_cause);
+    sl.textContent=parts.join(' · ');
+  }
 }
 
 function renderSystem(){
