@@ -630,6 +630,10 @@ async function refreshStatus(){
   if(r.version)$('fwVer').textContent='v'+r.version;
   if(r.now_unix){const d=new Date(r.now_unix*1000);
     $('clock').textContent=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;}
+  // Browser tab title follows the device name (or mDNS host as fallback)
+  // so multi-device users can tell tabs apart at a glance.
+  const tabName=r.device_name||r.mdns_host||'crino';
+  if(document.title!==tabName)document.title=tabName;
   const issues=[];
   if(!(r.wifi==='AP'||r.wifi==='STA_GOT_IP'))issues.push(t('issue.wifi'));
   if(!r.ntp_synced&&r.wifi==='STA_GOT_IP')issues.push(t('issue.ntp'));
