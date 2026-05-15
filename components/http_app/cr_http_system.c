@@ -104,13 +104,20 @@ esp_err_t metrics_get(httpd_req_t *req)
 
     cr_metrics_t m = { 0 };
     cr_metrics_load(&m);
+    size_t fs_total = 0, fs_used = 0;
+    cr_storage_fs_info(&fs_total, &fs_used);
+    int wifi_rssi = 0;
+    if (cr_wifi_state() == CR_WIFI_STATE_STA_GOT_IP) {
+        wifi_ap_record_t ap;
+        if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) wifi_rssi = ap.rssi;
+    }
 
     // Prometheus exposition format: every metric gets a HELP + TYPE line
     // ahead of its sample so scrapers can label dashboards correctly.
     // Counter = monotonically increasing, gauge = arbitrary up/down.
     // Buffer size keeps us well clear of single-line truncation; max
-    // observed body is ~700B with all headers.
-    char buf[2048];
+    // observed body is ~1.4 KB with all headers.
+    char buf[2560];
     int n = snprintf(buf, sizeof(buf),
         "# HELP crino_uptime_seconds Seconds since this boot.\n"
         "# TYPE crino_uptime_seconds counter\n"
@@ -133,12 +140,24 @@ esp_err_t metrics_get(httpd_req_t *req)
         "# HELP crino_wifi_state 0=DOWN 1=AP 2=STA_CONNECTING 3=STA_GOT_IP\n"
         "# TYPE crino_wifi_state gauge\n"
         "crino_wifi_state %d\n"
+        "# HELP crino_wifi_rssi_dbm STA-mode signal strength; 0 when not associated.\n"
+        "# TYPE crino_wifi_rssi_dbm gauge\n"
+        "crino_wifi_rssi_dbm %d\n"
         "# HELP crino_ntp_synced 1 when SNTP has set the wall clock at least once.\n"
         "# TYPE crino_ntp_synced gauge\n"
         "crino_ntp_synced %d\n"
         "# HELP crino_boot_loop_count Consecutive boots that didn't reach the 60s healthy mark.\n"
         "# TYPE crino_boot_loop_count gauge\n"
-        "crino_boot_loop_count %u\n",
+        "crino_boot_loop_count %u\n"
+        "# HELP crino_chip_temp_celsius Junction (silicon) temperature, not ambient.\n"
+        "# TYPE crino_chip_temp_celsius gauge\n"
+        "crino_chip_temp_celsius %.1f\n"
+        "# HELP crino_fs_total_bytes LittleFS partition size.\n"
+        "# TYPE crino_fs_total_bytes gauge\n"
+        "crino_fs_total_bytes %u\n"
+        "# HELP crino_fs_used_bytes LittleFS bytes in use.\n"
+        "# TYPE crino_fs_used_bytes gauge\n"
+        "crino_fs_used_bytes %u\n",
         (long long)(esp_timer_get_time() / 1000000),
         (unsigned)m.boot_count,
         (unsigned long long)m.total_uptime_s,
@@ -146,8 +165,12 @@ esp_err_t metrics_get(httpd_req_t *req)
         (unsigned)esp_get_free_heap_size(),
         (unsigned)esp_get_minimum_free_heap_size(),
         (int)cr_wifi_state(),
+        wifi_rssi,
         cr_time_is_synced(),
-        (unsigned)cr_metrics_boot_loop_count());
+        (unsigned)cr_metrics_boot_loop_count(),
+        chip_temp_c(),
+        (unsigned)fs_total,
+        (unsigned)fs_used);
 
     if (n < 0) n = 0;
     if (n >= (int)sizeof(buf)) n = sizeof(buf) - 1;
