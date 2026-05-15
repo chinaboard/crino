@@ -306,3 +306,15 @@ void cr_wifi_get_ip(char *out, size_t cap)
         snprintf(out, cap, IPSTR, IP2STR(addr));
     }
 }
+
+void cr_wifi_mdns_refresh_instance(void)
+{
+    if (!s_mdns_started) return;
+    char name[CR_DEVICE_NAME_MAX] = {0};
+    const char *instance = "Crino";
+    if (cr_config_get_device_name(name, sizeof(name)) == ESP_OK && name[0]) {
+        instance = name;
+    }
+    mdns_instance_name_set(instance);
+    ESP_LOGI(TAG, "mDNS instance -> %s", instance);
+}

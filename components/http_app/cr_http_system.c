@@ -333,6 +333,8 @@ esp_err_t device_name_post(httpd_req_t *req)
     esp_err_t err = cr_config_set_device_name(n->valuestring);
     cJSON_Delete(j);
     if (err != ESP_OK) return reply_text(req, "500 Internal Server Error", "save failed");
+    // Push to mDNS so Bonjour browsers see the new name without a reboot.
+    cr_wifi_mdns_refresh_instance();
     // Apps that surface the device name elsewhere (BLE adv name, mDNS instance,
     // sensor labels, etc.) should re-read from cr_config; the chassis itself
     // doesn't push.

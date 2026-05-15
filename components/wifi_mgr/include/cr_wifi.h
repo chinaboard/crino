@@ -25,6 +25,12 @@ const char *cr_wifi_state_str(cr_wifi_state_t s);
 // AP gateway IP). Empty string if no interface up.
 void cr_wifi_get_ip(char *out, size_t cap);
 
+// Re-read the device_name from cr_config and push it into the mDNS instance
+// name (the human-friendly label Bonjour browsers show alongside the
+// `crino-XXXX.local` hostname). Safe to call even before mDNS is up — no-op
+// in that case. Falls back to "Crino" when no device_name is set.
+void cr_wifi_mdns_refresh_instance(void);
+
 #ifdef __cplusplus
 }
 #endif
