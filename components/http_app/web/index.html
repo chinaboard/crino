@@ -399,6 +399,7 @@ const I18N = {
     'system.ota_confirm':'Upload {0} KB firmware and flash? Device auto-restarts when done.',
     'system.ota_progress':'Uploading {0}% · {1} / {2} KB',
     'system.ota_net_err':'Network error',
+    'system.ota_force_confirm':'Project name mismatch:\n{0}\n\nForce-flash anyway?',
     'system.backup_label':'Backup',
     'system.backup_note':'Backup contains the WiFi password and admin password hash — keep it secure. To restore: factory reset, then upload the backup on the first-run setup screen.',
     'system.download_backup':'Download backup JSON',
@@ -520,6 +521,7 @@ const I18N = {
     'system.ota_confirm':'上传 {0} KB 固件并烧录?完成后会自动重启。',
     'system.ota_progress':'上传中 {0}% · {1} / {2} KB',
     'system.ota_net_err':'网络错误',
+    'system.ota_force_confirm':'project_name 不一致:\n{0}\n\n强制烧录吗?',
     'system.backup_label':'备份',
     'system.backup_note':'备份包含 WiFi 密码与管理员密码哈希,请妥善保管。要恢复:先恢复出厂,然后在 first-run setup 页面上传备份文件。',
     'system.download_backup':'下载备份 JSON',
@@ -1105,21 +1107,41 @@ function renderSystem(){
   $('otaB').onclick=async()=>{
     const f=$('otaFile').files[0];if(!f){alert(t('system.pick_bin'));return;}
     if(!confirm(t('system.ota_confirm',(f.size/1024).toFixed(0))))return;
+    uploadOTA(f,false);
+  };
+  function uploadOTA(f,force){
     $('otaB').disabled=true;
     $('otaBarWrap').style.display='block';
     const xhr=new XMLHttpRequest();
-    xhr.open('POST','/api/system/ota');xhr.setRequestHeader('Content-Type','application/octet-stream');
+    xhr.open('POST','/api/system/ota'+(force?'?force=1':''));
+    xhr.setRequestHeader('Content-Type','application/octet-stream');
     xhr.upload.onprogress=e=>{
       if(e.lengthComputable){const pct=Math.floor(e.loaded*100/e.total);
         $('otaBar').style.width=pct+'%';
         $('otaProgress').textContent=t('system.ota_progress',pct,(e.loaded/1024).toFixed(0),(e.total/1024).toFixed(0));}
     };
-    xhr.onload=()=>{const ok=xhr.status>=200&&xhr.status<300;
-      $('otaProgress').textContent=ok?'✓ '+xhr.responseText:t('common.failed_prefix')+' '+xhr.status+': '+xhr.responseText;
-      if(ok)waitForReboot();$('otaB').disabled=false;};
+    xhr.onload=()=>{
+      const ok=xhr.status>=200&&xhr.status<300;
+      // 409 Conflict from the project-name guard: chassis refused because
+      // the new image's project_name differs from the running one. Offer
+      // a force-retry instead of just printing the error.
+      if(!ok && xhr.status===409 && !force &&
+         /project_name|force=1|is '/.test(xhr.responseText)){
+        $('otaProgress').textContent=t('common.failed_prefix')+' 409: '+xhr.responseText;
+        $('otaB').disabled=false;
+        if(confirm(t('system.ota_force_confirm',xhr.responseText))){
+          uploadOTA(f,true);
+        }
+        return;
+      }
+      $('otaProgress').textContent=ok?'✓ '+xhr.responseText
+                                    :t('common.failed_prefix')+' '+xhr.status+': '+xhr.responseText;
+      if(ok)waitForReboot();
+      $('otaB').disabled=false;
+    };
     xhr.onerror=()=>{$('otaProgress').textContent=t('system.ota_net_err');$('otaB').disabled=false;};
     xhr.send(f);
-  };
+  }
   async function rollback(target,confirmKey){
     if(!confirm(t(confirmKey)))return;
     const r=await fetch('/api/system/rollback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target})});

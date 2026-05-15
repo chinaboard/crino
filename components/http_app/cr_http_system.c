@@ -976,6 +976,37 @@ esp_err_t ota_post(httpd_req_t *req)
                               : "ota_end failed");
     }
 
+    // Project-name guard: refuse images whose project_name doesn't match
+    // the running image, unless the caller explicitly opts in via
+    // ?force=1. The check stops the obvious footgun — uploading some
+    // unrelated ESP32 project's .bin and bricking the device. esp_ota_end
+    // already validated the IDF image header (magic, sha256, size), so
+    // pdesc is trustworthy at this point. Image stays written to ota_X
+    // even on rejection — the next OTA attempt overwrites it.
+    {
+        bool force = false;
+        char qs[64];
+        if (httpd_req_get_url_query_str(req, qs, sizeof(qs)) == ESP_OK) {
+            char val[8];
+            if (httpd_query_key_value(qs, "force", val, sizeof(val)) == ESP_OK
+                && (val[0] == '1' || val[0] == 't' || val[0] == 'T')) {
+                force = true;
+            }
+        }
+        esp_app_desc_t new_desc;
+        const esp_app_desc_t *cur_desc = esp_app_get_description();
+        if (!force && esp_ota_get_partition_description(update, &new_desc) == ESP_OK
+            && cur_desc && strncmp(new_desc.project_name, cur_desc->project_name,
+                                    sizeof(new_desc.project_name)) != 0) {
+            char msg[160];
+            snprintf(msg, sizeof(msg),
+                     "image is '%s' (running '%s'). Re-POST with ?force=1 to override.",
+                     new_desc.project_name, cur_desc->project_name);
+            ESP_LOGE(TAG, "OTA refused: %s", msg);
+            return reply_text(req, "409 Conflict", msg);
+        }
+    }
+
     err = esp_ota_set_boot_partition(update);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "set_boot: %s", esp_err_to_name(err));
