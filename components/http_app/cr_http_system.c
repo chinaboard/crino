@@ -97,21 +97,45 @@ esp_err_t health_get(httpd_req_t *req)
 
 esp_err_t metrics_get(httpd_req_t *req)
 {
-    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    httpd_resp_set_type(req, "text/plain; charset=utf-8; version=0.0.4");
 
     cr_metrics_t m = { 0 };
     cr_metrics_load(&m);
 
-    char buf[480];
+    // Prometheus exposition format: every metric gets a HELP + TYPE line
+    // ahead of its sample so scrapers can label dashboards correctly.
+    // Counter = monotonically increasing, gauge = arbitrary up/down.
+    // Buffer size keeps us well clear of single-line truncation; max
+    // observed body is ~700B with all headers.
+    char buf[2048];
     int n = snprintf(buf, sizeof(buf),
-        "uptime_seconds %lld\n"
-        "boot_count %u\n"
-        "total_uptime_seconds %llu\n"
-        "last_uptime_seconds %u\n"
-        "heap_free_bytes %u\n"
-        "heap_min_free_bytes %u\n"
-        "wifi_state %d\n"
-        "ntp_synced %d\n",
+        "# HELP crino_uptime_seconds Seconds since this boot.\n"
+        "# TYPE crino_uptime_seconds counter\n"
+        "crino_uptime_seconds %lld\n"
+        "# HELP crino_boot_count Lifetime boot count (persisted in NVS).\n"
+        "# TYPE crino_boot_count counter\n"
+        "crino_boot_count %u\n"
+        "# HELP crino_total_uptime_seconds Lifetime cumulative uptime across all boots.\n"
+        "# TYPE crino_total_uptime_seconds counter\n"
+        "crino_total_uptime_seconds %llu\n"
+        "# HELP crino_last_uptime_seconds Uptime persisted at the end of the previous session.\n"
+        "# TYPE crino_last_uptime_seconds gauge\n"
+        "crino_last_uptime_seconds %u\n"
+        "# HELP crino_heap_free_bytes Free heap right now.\n"
+        "# TYPE crino_heap_free_bytes gauge\n"
+        "crino_heap_free_bytes %u\n"
+        "# HELP crino_heap_min_free_bytes All-time minimum free heap since boot.\n"
+        "# TYPE crino_heap_min_free_bytes gauge\n"
+        "crino_heap_min_free_bytes %u\n"
+        "# HELP crino_wifi_state 0=DOWN 1=AP 2=STA_CONNECTING 3=STA_GOT_IP\n"
+        "# TYPE crino_wifi_state gauge\n"
+        "crino_wifi_state %d\n"
+        "# HELP crino_ntp_synced 1 when SNTP has set the wall clock at least once.\n"
+        "# TYPE crino_ntp_synced gauge\n"
+        "crino_ntp_synced %d\n"
+        "# HELP crino_boot_loop_count Consecutive boots that didn't reach the 60s healthy mark.\n"
+        "# TYPE crino_boot_loop_count gauge\n"
+        "crino_boot_loop_count %u\n",
         (long long)(esp_timer_get_time() / 1000000),
         (unsigned)m.boot_count,
         (unsigned long long)m.total_uptime_s,
@@ -119,7 +143,8 @@ esp_err_t metrics_get(httpd_req_t *req)
         (unsigned)esp_get_free_heap_size(),
         (unsigned)esp_get_minimum_free_heap_size(),
         (int)cr_wifi_state(),
-        cr_time_is_synced());
+        cr_time_is_synced(),
+        (unsigned)cr_metrics_boot_loop_count());
 
     if (n < 0) n = 0;
     if (n >= (int)sizeof(buf)) n = sizeof(buf) - 1;
