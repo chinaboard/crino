@@ -54,3 +54,6 @@ esp_err_t auth_me_get(httpd_req_t *req);
 esp_err_t auth_change_password_post(httpd_req_t *req);
 esp_err_t setup_post(httpd_req_t *req);
 esp_err_t wifi_scan_get(httpd_req_t *req);
+esp_err_t wifi_get(httpd_req_t *req);
+esp_err_t wifi_post(httpd_req_t *req);
+esp_err_t rollback_post(httpd_req_t *req);

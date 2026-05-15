@@ -329,6 +329,155 @@ esp_err_t device_name_post(httpd_req_t *req)
     return reply_text(req, "200 OK", "ok");
 }
 
+// ---------- WiFi reconfigure (authenticated) ----------
+//
+// Lets an authenticated admin change WiFi credentials without going through
+// factory reset. The chassis's first-run /api/setup is locked once admin +
+// wifi are both set, so this is the only sanctioned runtime path. Password
+// is never returned over GET — the device only ever exposes the SSID.
+//
+// POST persists the new creds to NVS and restarts. On reboot the chassis
+// boots in NORMAL mode and start_sta() picks up the new creds. If they're
+// wrong the existing 10-min STA-give-up + boot-loop recovery catches it.
+
+esp_err_t wifi_get(httpd_req_t *req)
+{
+    if (require_auth(req) != ESP_OK) return ESP_OK;
+
+    cJSON *r = cJSON_CreateObject();
+
+    char ssid[CR_WIFI_SSID_MAX] = {0};
+    char pass[CR_WIFI_PASS_MAX] = {0};
+    if (cr_config_get_wifi(ssid, sizeof(ssid), pass, sizeof(pass)) == ESP_OK) {
+        cJSON_AddStringToObject(r, "saved_ssid", ssid);
+    } else {
+        cJSON_AddStringToObject(r, "saved_ssid", "");
+    }
+    cJSON_AddStringToObject(r, "wifi_state", cr_wifi_state_str(cr_wifi_state()));
+    char ip[16]; cr_wifi_get_ip(ip, sizeof(ip));
+    cJSON_AddStringToObject(r, "ip", ip);
+    return reply_json_status(req, "200 OK", r);
+}
+
+esp_err_t wifi_post(httpd_req_t *req)
+{
+    if (require_auth(req) != ESP_OK) return ESP_OK;
+
+    cJSON *j = recv_json_body(req);
+    if (!j) return reply_text(req, "400 Bad Request", "bad json");
+
+    const cJSON *ssid_j = cJSON_GetObjectItem(j, "ssid");
+    const cJSON *pass_j = cJSON_GetObjectItem(j, "password");
+
+    if (!cJSON_IsString(ssid_j) || ssid_j->valuestring[0] == '\0') {
+        cJSON_Delete(j);
+        return reply_text(req, "400 Bad Request", "ssid required");
+    }
+    if (strlen(ssid_j->valuestring) >= CR_WIFI_SSID_MAX) {
+        cJSON_Delete(j);
+        return reply_text(req, "400 Bad Request", "ssid too long");
+    }
+    const char *pwstr = cJSON_IsString(pass_j) ? pass_j->valuestring : "";
+    if (strlen(pwstr) >= CR_WIFI_PASS_MAX) {
+        cJSON_Delete(j);
+        return reply_text(req, "400 Bad Request", "password too long");
+    }
+
+    esp_err_t err = cr_config_set_wifi(ssid_j->valuestring, pwstr);
+    cJSON_Delete(j);
+    if (err != ESP_OK) return reply_text(req, "500 Internal Server Error", "save failed");
+
+    ESP_LOGW(TAG, "wifi reconfigured via web → restart");
+    cr_metrics_set_restart_cause(CR_RESTART_SETUP);
+    reply_text(req, "200 OK", "ok, restarting to join new SSID");
+    schedule_restart(2000);
+    return ESP_OK;
+}
+
+// ---------- Manual partition rollback (authenticated) ----------
+//
+// Lets an admin force-switch the boot partition to either:
+//   - "factory":   the immutable chassis (always present and bootable;
+//                  the catch-all rescue path)
+//   - "other_ota": whatever esp_ota_get_next_update_partition() points
+//                  at (i.e. the "other" OTA slot, the one we'd write to
+//                  on the next OTA upload). Useful when the user already
+//                  knows the previous image was good — bypasses the
+//                  10-min STA-giveup + 3-strike boot-loop wait.
+//
+// Differs from cr_recovery_handoff_to_factory() in that it's user-driven
+// (no boot-loop counter precondition) and accepts the "other_ota" target
+// for fast manual rollback past the 60s OTA-validate window.
+
+esp_err_t rollback_post(httpd_req_t *req)
+{
+    if (require_auth(req) != ESP_OK) return ESP_OK;
+
+    cJSON *j = recv_json_body(req);
+    if (!j) return reply_text(req, "400 Bad Request", "bad json");
+    const cJSON *t_j = cJSON_GetObjectItem(j, "target");
+    if (!cJSON_IsString(t_j)) {
+        cJSON_Delete(j);
+        return reply_text(req, "400 Bad Request",
+                          "target required: \"factory\" or \"other_ota\"");
+    }
+
+    const esp_partition_t *target = NULL;
+    const char *target_s = t_j->valuestring;
+    if (strcmp(target_s, "factory") == 0) {
+        target = esp_partition_find_first(
+            ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
+        if (!target) {
+            cJSON_Delete(j);
+            return reply_text(req, "404 Not Found",
+                              "no factory partition in this build");
+        }
+    } else if (strcmp(target_s, "other_ota") == 0) {
+        const esp_partition_t *running = esp_ota_get_running_partition();
+        target = esp_ota_get_next_update_partition(NULL);
+        if (!target || target == running) {
+            cJSON_Delete(j);
+            return reply_text(req, "409 Conflict",
+                              "no alternate ota slot available");
+        }
+        // Refuse if the slot was never written or got marked invalid by
+        // the bootloader. esp_ota_set_boot_partition would itself reject
+        // a corrupt image but the friendlier error message is worth it.
+        esp_ota_img_states_t st;
+        if (esp_ota_get_state_partition(target, &st) == ESP_OK &&
+            (st == ESP_OTA_IMG_INVALID || st == ESP_OTA_IMG_ABORTED ||
+             st == ESP_OTA_IMG_UNDEFINED)) {
+            cJSON_Delete(j);
+            return reply_text(req, "409 Conflict",
+                              "alternate slot has no valid image");
+        }
+    } else {
+        cJSON_Delete(j);
+        return reply_text(req, "400 Bad Request",
+                          "target must be \"factory\" or \"other_ota\"");
+    }
+    cJSON_Delete(j);
+
+    esp_err_t err = esp_ota_set_boot_partition(target);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "rollback set_boot(%s): %s",
+                 target->label, esp_err_to_name(err));
+        return reply_text(req, "500 Internal Server Error",
+                          "set_boot_partition failed");
+    }
+
+    ESP_LOGW(TAG, "manual rollback → '%s', restarting", target->label);
+    // Clear boot-loop counter — the user just made an explicit choice;
+    // start counting fresh against whatever boots next.
+    cr_metrics_boot_loop_clear();
+    cr_metrics_set_restart_cause(CR_RESTART_ADMIN);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "ok, rebooting into '%s'", target->label);
+    reply_text(req, "200 OK", msg);
+    schedule_restart(1500);
+    return ESP_OK;
+}
+
 // ---------- LED runtime toggle ----------
 
 esp_err_t led_get(httpd_req_t *req)

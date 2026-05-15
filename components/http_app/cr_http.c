@@ -232,6 +232,9 @@ esp_err_t cr_http_start(void)
         { .uri = "/api/system/restore",       .method = HTTP_POST, .handler = restore_post      },
         { .uri = "/api/system/diag",          .method = HTTP_GET,  .handler = diag_get          },
         { .uri = "/api/system/ota",           .method = HTTP_POST, .handler = ota_post          },
+        { .uri = "/api/system/wifi",          .method = HTTP_GET,  .handler = wifi_get          },
+        { .uri = "/api/system/wifi",          .method = HTTP_POST, .handler = wifi_post         },
+        { .uri = "/api/system/rollback",      .method = HTTP_POST, .handler = rollback_post     },
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i) {
         ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &routes[i]));
