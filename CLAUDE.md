@@ -109,6 +109,22 @@ under `tests/smoketest/` uses this pattern; see
 `tests/smoketest/README.md` for the working command + expected output
 + a manual cross-partition recovery test procedure.
 
+Apps that need extra sdkconfig keys on top of the chassis defaults (BT
+enabled, partition table changes, etc.) pass an absolute path via
+`EXTRA_SDKCONFIG_DEFAULTS`:
+
+```bash
+make build BOARD=supermini-c6 \
+    EXTRA_COMPONENT_DIRS=../app/components \
+    EXTRA_SDKCONFIG_DEFAULTS=/abs/path/to/app/sdkconfig.app.overlay
+```
+
+The overlay is applied AFTER `sdkconfig.defaults` and its per-target
+companion `sdkconfig.defaults.$(IDF_TARGET)` (so the overlay wins on
+conflicts). If the overlay has its own `<overlay>.$(IDF_TARGET)`
+sibling, IDF picks that up too — same convention as the chassis
+defaults.
+
 ## DEBUG_WIFI build-time bypass
 
 For dev boards, skip the SoftAP first-run wizard by baking creds in:
