@@ -88,15 +88,54 @@ DOCKER_TTY = docker run --rm -it -v $(PWD):/project -w /project $(EXTRA_DOCKER_V
 #   make build BOARD=supermini-c3                              # OFF (was sticky)
 EXTRA_CMAKE := -DEXTRA_COMPONENT_DIRS=$(EXTRA_COMPONENT_DIRS)
 
-# Downstream apps overlay extra sdkconfig defaults on top of the chassis ones
-# (e.g. to enable BT, change partition table). IDF reads
-# SDKCONFIG_DEFAULTS as a semicolon-separated list, applied left to right;
-# the per-target sdkconfig.defaults.$(IDF_TARGET) is still picked up
-# automatically because sdkconfig.defaults is first in the list.
-#   make build BOARD=supermini-c6 EXTRA_SDKCONFIG_DEFAULTS=/abs/path/to/app.bt
-ifdef EXTRA_SDKCONFIG_DEFAULTS
-EXTRA_CMAKE += -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;$(EXTRA_SDKCONFIG_DEFAULTS)"
+# Downstream apps that need a different partition layout (BLE-heavy apps need
+# bigger OTA slots, sensor apps may want more storage, etc.) can either:
+#
+#   1. Pick a chassis-provided preset:
+#        make build PARTITION_PRESET=ota-only   # 1792K x2 OTA, no factory
+#        make build PARTITION_PRESET=factory    # default: 1152K factory + 1216K x2 OTA
+#
+#   2. Hand-roll their own and pass an absolute path:
+#        make build EXTRA_PARTITION_TABLE=/app/partitions.app.csv
+#
+# Implementation: we generate a tiny sdkconfig overlay file at build time
+# that flips CONFIG_PARTITION_TABLE_CUSTOM_FILENAME to point at the chosen
+# csv. -DCONFIG_FOO=bar on the cmake command line does NOT actually override
+# kconfig values past the first reconfigure, so the sdkconfig-overlay route
+# is the only stable way to switch partition tables from outside.
+#
+# The overlay file lives in the chassis tree (so the IDF container can read
+# it from /project) and gets rebuilt every invocation (cheap — 2 lines).
+PARTITION_PRESET ?= factory
+ifeq ($(PARTITION_PRESET),factory)
+  CHASSIS_PARTITION_TABLE := partitions.csv
+else
+  CHASSIS_PARTITION_TABLE := partitions.$(PARTITION_PRESET).csv
 endif
+
+# Final partition table: EXTRA_PARTITION_TABLE wins if set, else use preset.
+ifdef EXTRA_PARTITION_TABLE
+PARTITION_TABLE_PATH := $(EXTRA_PARTITION_TABLE)
+else
+PARTITION_TABLE_PATH := $(CHASSIS_PARTITION_TABLE)
+endif
+
+# Generate a tiny sdkconfig overlay every reconfigure so the partition table
+# selection actually takes effect. We tack it onto the SDKCONFIG_DEFAULTS
+# semicolon list LAST so it wins over any caller-supplied overlay too.
+PARTITION_OVERLAY := sdkconfig.defaults.partition.gen
+$(shell printf 'CONFIG_PARTITION_TABLE_CUSTOM=y\nCONFIG_PARTITION_TABLE_CUSTOM_FILENAME="$(PARTITION_TABLE_PATH)"\nCONFIG_PARTITION_TABLE_FILENAME="$(PARTITION_TABLE_PATH)"\n' > $(PARTITION_OVERLAY))
+
+# Build the SDKCONFIG_DEFAULTS list:
+#   sdkconfig.defaults                              (chassis baseline, always)
+#   $(EXTRA_SDKCONFIG_DEFAULTS)                     (downstream overlay, optional)
+#   $(PARTITION_OVERLAY)                            (partition selection, always last)
+SDKCONFIG_DEFAULTS_LIST := sdkconfig.defaults
+ifdef EXTRA_SDKCONFIG_DEFAULTS
+SDKCONFIG_DEFAULTS_LIST := $(SDKCONFIG_DEFAULTS_LIST);$(EXTRA_SDKCONFIG_DEFAULTS)
+endif
+SDKCONFIG_DEFAULTS_LIST := $(SDKCONFIG_DEFAULTS_LIST);$(PARTITION_OVERLAY)
+EXTRA_CMAKE += -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_LIST)"
 
 .PHONY: build flash monitor flash-monitor erase clean fullclean menuconfig size shell boards
 

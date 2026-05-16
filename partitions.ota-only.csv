@@ -1,0 +1,36 @@
+# 4 MB flash layout, OTA-ONLY variant — no factory rescue partition.
+#
+# Trade-off vs the chassis default (factory + ota_0 + ota_1 + storage):
+#
+#   Default:    1152K factory  + 1216K ota_0 + 1216K ota_1 + 448K storage
+#   This file:                   1792K ota_0 + 1792K ota_1 + 384K storage
+#                                                            (no factory)
+#
+# Use this preset when:
+#   - app .bin > 1216 KB (typically anything pulling NimBLE / a fat HTTP UI)
+#   - 4 MB flash is fixed (most ESP32-C6 SuperMini boards)
+#   - you accept losing the "factory partition handoff" rescue layer in
+#     exchange for fitting the OTA slots
+#
+# Recovery story without factory:
+#   - Layer 1 (OTA rollback) still works: bootloader auto-reverts to the
+#     previous slot if the new image panics within 60 s of boot
+#   - Layer 2 (boot-loop counter / SoftAP recovery) still works: 3 bad
+#     boots arms recovery mode, chassis forces SoftAP `<prefix>-rec-XXXX`
+#     and the user OTAs a working image back via Web UI. This works as
+#     long as AT LEAST ONE of ota_0/ota_1 still boots into a chassis that
+#     can serve the recovery Web UI.
+#   - Layer 3 (factory partition handoff) is GONE: if BOTH ota slots are
+#     panic-loop bricks, you need USB to flash. This is the same risk
+#     profile as 99% of consumer ESP32 firmware, so it's not a regression
+#     by industry standard — just less paranoid than the chassis default.
+#
+# Reach this layout via: make build PARTITION_PRESET=ota-only
+
+# Name,     Type, SubType,  Offset,    Size,
+nvs,        data, nvs,      0x9000,    0x6000,
+phy_init,   data, phy,      0xf000,    0x1000,
+otadata,    data, ota,      0x10000,   0x2000,
+ota_0,      app,  ota_0,    0x20000,   0x1C0000,
+ota_1,      app,  ota_1,    0x1E0000,  0x1C0000,
+storage,    data, spiffs,   0x3A0000,  0x60000,
