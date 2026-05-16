@@ -73,10 +73,10 @@ ifdef DEBUG_WIFI_PASS
 EXTRA_CFLAGS += -DDEBUG_WIFI_PASS=\"$(DEBUG_WIFI_PASS)\"
 endif
 
-DOCKER_RUN = docker run --rm -v $(PWD):/project -w /project \
+DOCKER_RUN = docker run --rm -v $(PWD):/project -w /project $(EXTRA_DOCKER_VOLUMES) \
              -e IDF_TARGET=$(IDF_TARGET) -e EXTRA_CFLAGS="$(EXTRA_CFLAGS)" \
              -e EXTRA_COMPONENT_DIRS="$(EXTRA_COMPONENT_DIRS)" $(IDF_IMAGE)
-DOCKER_TTY = docker run --rm -it -v $(PWD):/project -w /project \
+DOCKER_TTY = docker run --rm -it -v $(PWD):/project -w /project $(EXTRA_DOCKER_VOLUMES) \
              -e IDF_TARGET=$(IDF_TARGET) -e EXTRA_CFLAGS="$(EXTRA_CFLAGS)" \
              -e EXTRA_COMPONENT_DIRS="$(EXTRA_COMPONENT_DIRS)" $(IDF_IMAGE)
 
