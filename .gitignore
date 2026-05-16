@@ -10,3 +10,4 @@ dependencies.lock
 .idea/
 .DS_Store
 .claude/
+sdkconfig.defaults.partition.gen
