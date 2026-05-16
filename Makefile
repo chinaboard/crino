@@ -88,6 +88,16 @@ DOCKER_TTY = docker run --rm -it -v $(PWD):/project -w /project \
 #   make build BOARD=supermini-c3                              # OFF (was sticky)
 EXTRA_CMAKE := -DEXTRA_COMPONENT_DIRS=$(EXTRA_COMPONENT_DIRS)
 
+# Downstream apps overlay extra sdkconfig defaults on top of the chassis ones
+# (e.g. to enable BT, change partition table). IDF reads
+# SDKCONFIG_DEFAULTS as a semicolon-separated list, applied left to right;
+# the per-target sdkconfig.defaults.$(IDF_TARGET) is still picked up
+# automatically because sdkconfig.defaults is first in the list.
+#   make build BOARD=supermini-c6 EXTRA_SDKCONFIG_DEFAULTS=/abs/path/to/app.bt
+ifdef EXTRA_SDKCONFIG_DEFAULTS
+EXTRA_CMAKE += -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;$(EXTRA_SDKCONFIG_DEFAULTS)"
+endif
+
 .PHONY: build flash monitor flash-monitor erase clean fullclean menuconfig size shell boards
 
 boards:
