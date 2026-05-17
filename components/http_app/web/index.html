@@ -687,6 +687,11 @@ async function init(){
     LANG=$('langSel').value;
     localStorage.setItem('cr_lang',LANG);
     document.documentElement.lang = LANG==='zh' ? 'zh-CN' : 'en';
+    // App-tab iframe doesn't receive 'storage' events from same-tab
+    // parent writes, so its pickLang() result would be stale. render()
+    // → renderApp() rewrites main.innerHTML which forces the iframe to
+    // reload — pickLang then reads the now-updated localStorage and
+    // paints in the new language.
     refreshStatus().then(render);
   };
   $('topLogoutB').onclick=async()=>{
