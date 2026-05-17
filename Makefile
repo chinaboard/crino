@@ -137,7 +137,7 @@ endif
 SDKCONFIG_DEFAULTS_LIST := $(SDKCONFIG_DEFAULTS_LIST);$(PARTITION_OVERLAY)
 EXTRA_CMAKE += -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_LIST)"
 
-.PHONY: build flash monitor flash-monitor erase clean fullclean menuconfig size shell boards
+.PHONY: build flash monitor flash-monitor erase clean fullclean menuconfig size shell boards version-stamp
 
 boards:
 	@echo "Available boards (set BOARD=<name>):"
@@ -147,7 +147,26 @@ boards:
 		printf "  %-18s %s\n" "$$name" "$$first"; \
 	done
 
-build:
+# Refresh ./VERSION from `git describe` on the HOST before each build so the
+# bin reports the real current tag even when the container can't run git
+# (submodule case: container only mounts crino/, the parent's
+# .git/modules/crino path doesn't exist inside). We only WRITE when:
+#   1. git succeeds (don't clobber the file with empty on git-less systems)
+#   2. the new value differs from current (don't touch the file on every
+#      build — that would invalidate ccache + make every cmake reconfigure
+#      see the file as changed and rerun more work than needed)
+version-stamp:
+	@desc=$$(git -c safe.directory=* describe --tags --dirty --always 2>/dev/null); \
+	if [ -n "$$desc" ]; then \
+		new=$${desc#v}; \
+		cur=$$(cat VERSION 2>/dev/null); \
+		if [ "$$new" != "$$cur" ]; then \
+			echo "$$new" > VERSION; \
+			echo "version-stamp: VERSION $$cur -> $$new"; \
+		fi; \
+	fi
+
+build: version-stamp
 	$(DOCKER_RUN) idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(SDKCONFIG) $(EXTRA_CMAKE) reconfigure build
 
 flash:

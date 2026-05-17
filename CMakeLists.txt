@@ -13,6 +13,16 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 # So `git tag v0.5.5 && git push --tags` is the only step needed to release
 # a clean version; off-tag dev builds get a self-describing string that
 # pinpoints the source state without needing a separate timestamp.
+#
+# Note: when crino is consumed as a git submodule by a downstream app and
+# the build happens inside a Docker container that only bind-mounts the
+# crino tree, the submodule's `.git` file points at a path that doesn't
+# exist inside the container — git fails silently here and PROJECT_VER
+# falls back to ./VERSION. The chassis Makefile's `version-stamp` target
+# refreshes ./VERSION from `git describe` on the HOST before each build,
+# so the fallback value is always the real current tag. If you build
+# without that wrapper (e.g. `idf.py build` directly), make sure VERSION
+# is current.
 execute_process(
     COMMAND git -c safe.directory=* describe --tags --dirty --always
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
