@@ -741,6 +741,40 @@ esp_err_t ntp_server_post(httpd_req_t *req)
     return reply_text(req, "200 OK", "ok, resyncing");
 }
 
+// ---------- timezone (POSIX TZ string) ----------
+//
+// GET returns the active TZ + current wall time (so the UI can show "device
+// thinks it's HH:MM:SS now" as live feedback that the offset is right).
+// POST replaces it, persists to NVS, applies via setenv()+tzset(). Effect
+// is immediate — no reboot, no re-sync needed; the next localtime() call
+// already uses the new offset.
+
+esp_err_t tz_get(httpd_req_t *req)
+{
+    if (require_auth(req) != ESP_OK) return ESP_OK;
+    cJSON *r = cJSON_CreateObject();
+    cJSON_AddStringToObject(r, "tz", cr_time_get_tz());
+    cJSON_AddNumberToObject(r, "now_unix", (double)cr_time_now_unix());
+    return reply_json_status(req, "200 OK", r);
+}
+
+esp_err_t tz_post(httpd_req_t *req)
+{
+    if (require_auth(req) != ESP_OK) return ESP_OK;
+    cJSON *j = recv_json_body(req);
+    if (!j) return reply_text(req, "400 Bad Request", "bad json");
+    const cJSON *s = cJSON_GetObjectItem(j, "tz");
+    if (!cJSON_IsString(s) || !s->valuestring[0]) {
+        cJSON_Delete(j);
+        return reply_text(req, "400 Bad Request", "tz (string) required");
+    }
+    esp_err_t err = cr_time_set_tz(s->valuestring);
+    cJSON_Delete(j);
+    if (err == ESP_ERR_INVALID_SIZE) return reply_text(req, "400 Bad Request", "tz too long");
+    if (err != ESP_OK) return reply_text(req, "500 Internal Server Error", "save failed");
+    return reply_text(req, "200 OK", "ok");
+}
+
 esp_err_t metrics_reset_post(httpd_req_t *req)
 {
     if (require_auth(req) != ESP_OK) return ESP_OK;
@@ -873,6 +907,8 @@ esp_err_t backup_get(httpd_req_t *req)
     }
     const char *ntp = cr_time_get_ntp_server();
     if (ntp && ntp[0]) cJSON_AddStringToObject(cfg, "ntp_server", ntp);
+    const char *tz = cr_time_get_tz();
+    if (tz && tz[0]) cJSON_AddStringToObject(cfg, "tz", tz);
 
     cJSON_AddItemToObject(root, "config", cfg);
 
@@ -905,6 +941,7 @@ esp_err_t restore_post(httpd_req_t *req)
         const cJSON *hash_j = cJSON_GetObjectItem(cfg, "admin_hash_hex");
         const cJSON *name_j = cJSON_GetObjectItem(cfg, "device_name");
         const cJSON *ntp_j  = cJSON_GetObjectItem(cfg, "ntp_server");
+        const cJSON *tz_j   = cJSON_GetObjectItem(cfg, "tz");
 
         if (cJSON_IsString(ssid_j)) {
             cr_config_set_wifi(ssid_j->valuestring,
@@ -925,6 +962,9 @@ esp_err_t restore_post(httpd_req_t *req)
         }
         if (cJSON_IsString(ntp_j) && ntp_j->valuestring[0]) {
             cr_time_set_ntp_server(ntp_j->valuestring);
+        }
+        if (cJSON_IsString(tz_j) && tz_j->valuestring[0]) {
+            cr_time_set_tz(tz_j->valuestring);
         }
     }
 

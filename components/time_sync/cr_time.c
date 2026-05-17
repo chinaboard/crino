@@ -18,25 +18,27 @@ static const char *TAG = "time";
 #define NTP_SERVER_DEFAULT "ntp.aliyun.com"
 #define NTP_NVS_NS         "time"
 #define NTP_NVS_KEY        "ntp_server"
+#define TZ_NVS_KEY         "tz"
 
-// POSIX TZ baked in at build time; used for device-side localtime needs (CSV
-// export, calendar bucketing, today detection). Override via Makefile
-// `-DCR_TZ='"JST-9"'`. The Web UI displays times in the browser's timezone, so
-// this only matters for export/bucket boundaries.
+// POSIX TZ baked in at build time. Used as the DEFAULT when NVS has no
+// override. Override via Makefile `-DCR_TZ='"JST-9"'` for the build-time
+// default; at runtime use cr_time_set_tz() (web UI) — that path persists
+// to NVS and survives reboots, no reflash needed.
 #ifndef CR_TZ
 #define CR_TZ "CST-8"
 #endif
 
-// Mutex protects the 64-bit anchor pair + the NTP server buffer. Anchor pair
-// is written from the SNTP `on_sync` callback (FreeRTOS task context) and
-// read from HTTP handlers — without the lock, 64-bit reads on the 32-bit
-// RISC-V chip can tear. NTP server string is similarly mutated by HTTP POST
-// while another HTTP GET reads it.
+// Mutex protects the 64-bit anchor pair, the NTP server buffer, AND the TZ
+// buffer. Anchor pair is written from the SNTP `on_sync` callback (FreeRTOS
+// task context) and read from HTTP handlers — without the lock, 64-bit
+// reads on the 32-bit RISC-V chip can tear. NTP/TZ strings are similarly
+// mutated by HTTP POST while another HTTP GET reads them.
 static SemaphoreHandle_t s_lock = NULL;
 static volatile bool s_synced = false;
 static int64_t       s_wall_at_sync_us = 0;
 static int64_t       s_mono_at_sync_us = 0;
 static char          s_ntp_server[CR_NTP_SERVER_MAX] = NTP_SERVER_DEFAULT;
+static char          s_tz[CR_TZ_MAX] = CR_TZ;
 static bool          s_sntp_inited = false;
 
 #define LOCK()   do { if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY); } while (0)
@@ -70,16 +72,36 @@ static void load_ntp_server(void)
     nvs_close(h);
 }
 
+// Loaded from the same "time" NVS namespace as the NTP server. Apply BEFORE
+// the first setenv(TZ)+tzset() in cr_time_init so the very first localtime()
+// uses the persisted offset, not the build-time fallback.
+static void load_tz(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(NTP_NVS_NS, NVS_READONLY, &h) != ESP_OK) return;
+    char buf[CR_TZ_MAX];
+    size_t sz = sizeof(buf);
+    if (nvs_get_str(h, TZ_NVS_KEY, buf, &sz) == ESP_OK && buf[0]) {
+        buf[sizeof(buf) - 1] = '\0';
+        LOCK();
+        strncpy(s_tz, buf, sizeof(s_tz) - 1);
+        s_tz[sizeof(s_tz) - 1] = '\0';
+        UNLOCK();
+    }
+    nvs_close(h);
+}
+
 esp_err_t cr_time_init(void)
 {
     if (!s_lock) {
         s_lock = xSemaphoreCreateMutex();
         if (!s_lock) return ESP_ERR_NO_MEM;
     }
-    setenv("TZ", CR_TZ, 1);
+    load_tz();
+    setenv("TZ", s_tz, 1);
     tzset();
     load_ntp_server();
-    ESP_LOGI(TAG, "tz=%s, ntp=%s, awaiting sync", CR_TZ, s_ntp_server);
+    ESP_LOGI(TAG, "tz=%s, ntp=%s, awaiting sync", s_tz, s_ntp_server);
     return ESP_OK;
 }
 
@@ -172,4 +194,37 @@ int64_t cr_time_last_sync_unix(void)
     int64_t v = s_wall_at_sync_us;
     UNLOCK();
     return v / 1000000;
+}
+
+const char *cr_time_get_tz(void)
+{
+    // Pointer into shared buffer — same caveats as cr_time_get_ntp_server().
+    return s_tz;
+}
+
+esp_err_t cr_time_set_tz(const char *tz)
+{
+    if (!tz || !tz[0]) return ESP_ERR_INVALID_ARG;
+    if (strlen(tz) >= CR_TZ_MAX) return ESP_ERR_INVALID_SIZE;
+
+    LOCK();
+    strncpy(s_tz, tz, sizeof(s_tz) - 1);
+    s_tz[sizeof(s_tz) - 1] = '\0';
+    UNLOCK();
+
+    // Apply to libc immediately — any subsequent localtime_r() will pick up
+    // the new offset. tzset() reads the TZ env var, so setenv must come
+    // first. _r=1 to overwrite the existing value.
+    setenv("TZ", s_tz, 1);
+    tzset();
+
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NTP_NVS_NS, NVS_READWRITE, &h);
+    if (err == ESP_OK) {
+        nvs_set_str(h, TZ_NVS_KEY, s_tz);
+        err = nvs_commit(h);
+        nvs_close(h);
+    }
+    ESP_LOGI(TAG, "tz -> %s", s_tz);
+    return err;
 }

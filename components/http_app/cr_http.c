@@ -264,6 +264,8 @@ esp_err_t cr_http_start(void)
         { .uri = "/api/system/led",           .method = HTTP_POST, .handler = led_post          },
         { .uri = "/api/system/ntp_server",    .method = HTTP_GET,  .handler = ntp_server_get    },
         { .uri = "/api/system/ntp_server",    .method = HTTP_POST, .handler = ntp_server_post   },
+        { .uri = "/api/system/tz",            .method = HTTP_GET,  .handler = tz_get            },
+        { .uri = "/api/system/tz",            .method = HTTP_POST, .handler = tz_post           },
         { .uri = "/api/system/metrics_reset", .method = HTTP_POST, .handler = metrics_reset_post },
         { .uri = "/api/system/logs",          .method = HTTP_GET,  .handler = logs_get          },
         { .uri = "/api/system/logs/clear",    .method = HTTP_POST, .handler = logs_clear_post   },

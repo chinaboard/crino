@@ -62,7 +62,9 @@ Other useful targets (all honor `BOARD=`):
 | `make boards`        | list known board presets (`boards/*.mk` with their first-line comment) |
 
 Build-time timezone (POSIX TZ string, baked in via `-DCR_TZ`, default
-`CST-8`):
+`CST-8`) — this is just the FALLBACK / first-boot value. At runtime the
+Web UI's System → Timezone card writes a TZ string to NVS that wins
+over the build-time value:
 
 ```bash
 make build BOARD=supermini-c3 TZ=JST-9   # Japan

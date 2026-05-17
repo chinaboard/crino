@@ -33,6 +33,15 @@ int64_t   cr_time_mono_to_unix(int64_t mono_us);
 const char *cr_time_get_ntp_server(void);
 esp_err_t   cr_time_set_ntp_server(const char *server);
 
+// POSIX TZ string (e.g. "CST-8", "JST-9", "EST5EDT", "UTC0"). Persisted in
+// NVS namespace "time" key "tz". Falls back to the build-time CR_TZ default
+// when NVS has no value. Setting calls setenv("TZ", ...) + tzset() so the
+// new offset takes effect immediately for any subsequent localtime() /
+// strftime() calls — no reboot. Must be ≤ CR_TZ_MAX-1 chars.
+#define CR_TZ_MAX 48
+const char *cr_time_get_tz(void);
+esp_err_t   cr_time_set_tz(const char *tz);
+
 // Wall-clock unix seconds when SNTP last successfully synced. 0 if never.
 int64_t   cr_time_last_sync_unix(void);
 

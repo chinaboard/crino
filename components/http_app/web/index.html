@@ -376,6 +376,9 @@ const I18N = {
     'system.ntp_label':'NTP server',
     'system.ntp_synced':'Synced {0}.',
     'system.ntp_unsynced':'Not synced yet — check server reachability.',
+    'system.tz_label':'Timezone',
+    'system.tz_desc':'POSIX TZ string. Affects device-side localtime (CSV bucketing, today detection). Applied immediately, no reboot.',
+    'system.tz_now':'Device now: {0}',
     'system.reset_stats':'Reset boot/uptime stats',
     'system.reset_stats_confirm':'Reset boot count + total uptime to zero?',
     'system.sync_ntp':'Sync NTP',
@@ -503,6 +506,9 @@ const I18N = {
     'system.ntp_label':'NTP 服务器',
     'system.ntp_synced':'已同步 ({0})。',
     'system.ntp_unsynced':'尚未同步 — 检查服务器是否可达。',
+    'system.tz_label':'时区',
+    'system.tz_desc':'POSIX TZ 字符串。影响设备侧 localtime(CSV 分桶、今日判定等)。立即生效,无需重启。',
+    'system.tz_now':'设备当前时间:{0}',
     'system.reset_stats':'清零启动/运行统计',
     'system.reset_stats_confirm':'把启动次数 + 累计运行时间清零?',
     'system.sync_ntp':'同步时间',
@@ -1024,6 +1030,25 @@ function renderSystem(){
         <div class=note id=ntpStatus></div>
       </div>
       <div class=card>
+        <div class=ctitle>${t('system.tz_label')}</div>
+        <div class=cdesc>${t('system.tz_desc')}</div>
+        <div class=row>
+          <input class=input id=tzInput placeholder='CST-8' style='flex:1'>
+          <button class=btn id=tzSaveB>${t('common.save')}</button>
+        </div>
+        <div style='margin-top:6px' id=tzChips>
+          <span class=ssidchip data-tz='CST-8'>CST-8 (中国)</span>
+          <span class=ssidchip data-tz='JST-9'>JST-9 (日本)</span>
+          <span class=ssidchip data-tz='KST-9'>KST-9 (韩国)</span>
+          <span class=ssidchip data-tz='UTC0'>UTC0</span>
+          <span class=ssidchip data-tz='GMT0BST,M3.5.0/1,M10.5.0'>UK (GMT/BST)</span>
+          <span class=ssidchip data-tz='CET-1CEST,M3.5.0,M10.5.0/3'>EU central</span>
+          <span class=ssidchip data-tz='EST5EDT,M3.2.0,M11.1.0'>US East</span>
+          <span class=ssidchip data-tz='PST8PDT,M3.2.0,M11.1.0'>US Pacific</span>
+        </div>
+        <div class=note id=tzStatus></div>
+      </div>
+      <div class=card>
         <div class=ctitle>${t('system.backup_label')}</div>
         <div class=cdesc>${t('system.backup_note')}</div>
         <a href='/api/system/backup' download><button class=btn>${t('system.download_backup')}</button></a>
@@ -1102,6 +1127,35 @@ function renderSystem(){
   document.querySelectorAll('#ntpChips .ssidchip').forEach(c=>c.onclick=()=>{
     $('ntpServer').value=c.dataset.ntp;
     $('ntpServer').focus();
+  });
+  // Timezone card: load current TZ + show device-side wall clock so user can
+  // eyeball whether the offset matches their real local time before saving.
+  const renderTzNow = unix => {
+    if(!unix||!$('tzStatus'))return;
+    // Use the BROWSER's render of the unix ts in the user's local tz, plus
+    // the raw unix seconds, so they can sanity-check the device clock against
+    // their own clock. Cheap correctness signal — if device wall time is
+    // wildly off, NTP didn't sync or the TZ offset is wrong.
+    const d=new Date(unix*1000);
+    $('tzStatus').textContent=t('system.tz_now', d.toLocaleString());
+  };
+  fetch('/api/system/tz').then(r=>r.json()).then(d=>{
+    if($('tzInput'))$('tzInput').value=d.tz||'';
+    renderTzNow(d.now_unix);
+  }).catch(()=>{});
+  $('tzSaveB').onclick=async e=>{
+    const v=$('tzInput').value.trim();
+    if(!v){alert(t('common.failed'));return;}
+    const r=await fetch('/api/system/tz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tz:v})});
+    if(r.ok){
+      e.target.textContent='✓';setTimeout(()=>e.target.textContent=t('common.save'),1000);
+      // Re-fetch so the "device now" line reflects the new offset.
+      fetch('/api/system/tz').then(r=>r.json()).then(d=>renderTzNow(d.now_unix)).catch(()=>{});
+    } else alert(t('common.failed_prefix')+' '+await r.text());
+  };
+  document.querySelectorAll('#tzChips .ssidchip').forEach(c=>c.onclick=()=>{
+    $('tzInput').value=c.dataset.tz;
+    $('tzInput').focus();
   });
   $('metricsResetB').onclick=async e=>{
     if(!confirm(t('system.reset_stats_confirm')))return;

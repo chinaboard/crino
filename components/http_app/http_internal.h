@@ -42,6 +42,8 @@ esp_err_t led_get(httpd_req_t *req);
 esp_err_t led_post(httpd_req_t *req);
 esp_err_t ntp_server_get(httpd_req_t *req);
 esp_err_t ntp_server_post(httpd_req_t *req);
+esp_err_t tz_get(httpd_req_t *req);
+esp_err_t tz_post(httpd_req_t *req);
 esp_err_t metrics_reset_post(httpd_req_t *req);
 esp_err_t logs_get(httpd_req_t *req);
 esp_err_t logs_clear_post(httpd_req_t *req);
