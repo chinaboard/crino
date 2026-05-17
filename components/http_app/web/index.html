@@ -744,12 +744,14 @@ function render(){
   }
   renderNav($('sidebar'),state.view);
   renderNav($('mobiletabs'),state.view);
-  // Restore default main-area padding each render — the app iframe view
-  // strips it (renderApp), so we have to put it back before any non-app
-  // view paints. Kept as a class-level reset rather than per-view sets
-  // so future views don't have to remember to do this.
+  // Reset main-area overrides each render — renderApp zeroes padding
+  // and tweaks .mainwrap so the iframe can fill. Reset them here so
+  // navigating away from app view doesn't leak those into Overview /
+  // System (which expect the default padding + 980px wrap).
   const _mainEl=document.querySelector('.main');
   if(_mainEl){_mainEl.style.padding='';}
+  const _wrap=$('main');
+  if(_wrap){_wrap.style.height='';_wrap.style.maxWidth='';}
   if(state.view==='app')renderApp();
   else if(state.view==='system')renderSystem();
   else renderOverview();
@@ -763,15 +765,22 @@ function render(){
 function renderApp(){
   const url=state.status?.app_url;
   if(!url){state.view='overview';localStorage.setItem('cr_view','overview');render();return;}
-  // height:100% fills the .main flex item (which itself takes the
-  // remaining viewport via flex:1 under .shell); explicit vh math
-  // was wrong because it didn't account for the topbar height nor
-  // the mobile-only .mobiletabs bar (~40px) — used to under-cut on
-  // desktop and over-cut on phones. 100% just inherits .main's
-  // computed height correctly in both layouts.
-  $('main').innerHTML=`<iframe src='${url}' style='width:100%;height:100%;border:0;background:var(--bg);display:block'></iframe>`;
+  // Layout chain to make the iframe actually fill the viewport:
+  //   .body (flex container, flex:1)
+  //     .main (flex item, flex:1 + overflow-y:auto) — already fills via flex
+  //       .mainwrap#main (max-width:980px, block)   — height shrink-wraps
+  //         <iframe>                                — height:100% needs sized parent
+  //
+  // .mainwrap is a normal block so iframe height:100% would resolve
+  // to 0 unless .mainwrap itself has height. .main is already sized
+  // by flex, so just give .mainwrap height:100% and drop its 980px
+  // max-width so the iframe spans the full panel. Padding goes to 0
+  // so the app page owns edge-to-edge layout.
   const mainEl=document.querySelector('.main');
+  const wrapEl=$('main');  /* id=main is on .mainwrap, not <main class=main> */
   if(mainEl){mainEl.style.padding='0';}
+  if(wrapEl){wrapEl.style.height='100%';wrapEl.style.maxWidth='none';}
+  wrapEl.innerHTML=`<iframe src='${url}' style='width:100%;height:100%;border:0;background:var(--bg);display:block'></iframe>`;
 }
 
 function wizardDeviceBadge(){
