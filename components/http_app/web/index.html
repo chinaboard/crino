@@ -763,9 +763,13 @@ function render(){
 function renderApp(){
   const url=state.status?.app_url;
   if(!url){state.view='overview';localStorage.setItem('cr_view','overview');render();return;}
-  // Strip main padding for the iframe — the app page controls its own
-  // layout from edge to edge.
-  $('main').innerHTML=`<iframe src='${url}' style='width:100%;height:calc(100vh - 16px);border:0;background:var(--bg);display:block'></iframe>`;
+  // height:100% fills the .main flex item (which itself takes the
+  // remaining viewport via flex:1 under .shell); explicit vh math
+  // was wrong because it didn't account for the topbar height nor
+  // the mobile-only .mobiletabs bar (~40px) — used to under-cut on
+  // desktop and over-cut on phones. 100% just inherits .main's
+  // computed height correctly in both layouts.
+  $('main').innerHTML=`<iframe src='${url}' style='width:100%;height:100%;border:0;background:var(--bg);display:block'></iframe>`;
   const mainEl=document.querySelector('.main');
   if(mainEl){mainEl.style.padding='0';}
 }
