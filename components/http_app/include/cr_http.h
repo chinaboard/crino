@@ -49,6 +49,19 @@ void cr_app_init(void);
 //         cJSON_AddNumberToObject(root, "app_temp_c", read_sensor());
 //         cJSON_AddBoolToObject(root, "app_session_active", g_session);
 //     }
+//
+// Two field names are reserved (chassis Overview UI reads them):
+//
+//   "app_url"   — host-relative URL of the app's own settings/status
+//                 page (e.g. "/app"). When present, the Overview tab
+//                 renders a card with a link button to that URL so
+//                 users can find the app UI without typing the path.
+//   "app_label" — optional human-readable name for that card title
+//                 (e.g. "ATC Time Sync"). Falls back to a generic
+//                 "App" label when absent.
+//
+// Apps that have no UI of their own simply don't set "app_url" — the
+// chassis Overview hides the card entirely in that case.
 void cr_app_status_json(cJSON *root);
 
 #ifdef __cplusplus
