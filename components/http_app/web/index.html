@@ -366,7 +366,6 @@ const I18N = {
     'overview.copy_hint':'Click to copy device summary',
     'overview.copied':'copied',
     'overview.app_label':'App',
-    'overview.app_open':'Open app page →',
 
     'system.title':'System',
     'system.desc':'Diagnostics, device name, firmware update, backup, danger zone.',
@@ -498,7 +497,6 @@ const I18N = {
     'overview.copy_hint':'点击复制设备概要',
     'overview.copied':'已复制',
     'overview.app_label':'应用',
-    'overview.app_open':'打开应用页面 →',
 
     'system.title':'系统',
     'system.desc':'诊断信息、设备名、固件升级、备份与危险操作。',
@@ -595,18 +593,32 @@ function t(key, ...args){
   return s;
 }
 
-const NAV=[
+const NAV_BASE=[
   {id:'overview',k:'nav.overview'},
   {id:'system',k:'nav.system'},
 ];
+// Dynamic nav: appends an extra tab when /api/system/status reports an
+// app_url field (downstream-app convention). Computed every renderNav()
+// call so the tab appears as soon as the first status arrives — and
+// disappears cleanly if the field ever goes away. The tab opens the app
+// page in an iframe inside the chassis main area (renderApp); cookies
+// are shared since it's same-origin.
+function navItems(){
+  const items=NAV_BASE.slice();
+  const s=state.status;
+  if(s&&s.app_url){
+    items.push({id:'app',label:s.app_label||t('overview.app_label'),url:s.app_url});
+  }
+  return items;
+}
 let state={view:'overview',authed:false,setupMode:false,status:null,logsTimer:null};
 
 function renderNav(host,active){
   host.innerHTML='';
-  for(const n of NAV){
+  for(const n of navItems()){
     const el=document.createElement('div');
     el.className='navitem'+(n.id===active?' active':'');
-    el.textContent=t(n.k);
+    el.textContent=n.k?t(n.k):n.label;
     el.onclick=()=>{state.view=n.id;localStorage.setItem('cr_view',n.id);render();};
     host.appendChild(el);
   }
@@ -682,7 +694,7 @@ async function init(){
     state.authed=false;render();
   };
   const v=localStorage.getItem('cr_view');
-  if(v&&NAV.find(n=>n.id===v))state.view=v;
+  if(v&&(v==='overview'||v==='system'||v==='app'))state.view=v;
   await refreshStatus();
   await refreshAuth();
   render();
@@ -690,9 +702,17 @@ async function init(){
   // browser's own bandwidth and the device's HTTP cycles when nobody's
   // looking. visibilitychange also kicks an immediate refresh on return so
   // the user doesn't see a stale 5s window when they tab back.
+  // Also re-renders the sidebar so app_url tabs appear/disappear when the
+  // downstream app comes up after chassis boot.
   setInterval(async()=>{
     if(document.hidden)return;
+    const before=JSON.stringify({u:state.status?.app_url,l:state.status?.app_label});
     await refreshStatus();
+    const after=JSON.stringify({u:state.status?.app_url,l:state.status?.app_label});
+    if(before!==after&&state.authed&&!state.setupMode){
+      renderNav($('sidebar'),state.view);
+      renderNav($('mobiletabs'),state.view);
+    }
     if(state.view==='overview'&&state.authed)refreshOverviewLite();
   },5000);
   document.addEventListener('visibilitychange',()=>{
@@ -719,8 +739,30 @@ function render(){
   }
   renderNav($('sidebar'),state.view);
   renderNav($('mobiletabs'),state.view);
-  if(state.view==='system')renderSystem();
+  // Restore default main-area padding each render — the app iframe view
+  // strips it (renderApp), so we have to put it back before any non-app
+  // view paints. Kept as a class-level reset rather than per-view sets
+  // so future views don't have to remember to do this.
+  const _mainEl=document.querySelector('.main');
+  if(_mainEl){_mainEl.style.padding='';}
+  if(state.view==='app')renderApp();
+  else if(state.view==='system')renderSystem();
   else renderOverview();
+}
+
+// App tab: render the downstream app's own page inside an iframe so it
+// appears in-place under the chassis sidebar/main layout. iframe runs
+// the app's JS in its own context; cookies (chassis cr_session) are
+// shared automatically because same-origin. Falls back to Overview if
+// state.view='app' is stale (e.g. app uninstalled mid-session).
+function renderApp(){
+  const url=state.status?.app_url;
+  if(!url){state.view='overview';localStorage.setItem('cr_view','overview');render();return;}
+  // Strip main padding for the iframe — the app page controls its own
+  // layout from edge to edge.
+  $('main').innerHTML=`<iframe src='${url}' style='width:100%;height:calc(100vh - 16px);border:0;background:var(--bg);display:block'></iframe>`;
+  const mainEl=document.querySelector('.main');
+  if(mainEl){mainEl.style.padding='0';}
 }
 
 function wizardDeviceBadge(){
@@ -857,17 +899,11 @@ function renderLogin(){
 }
 
 async function renderOverview(){
-  // App card is conditionally rendered AFTER first status load — chassis
-  // can't know in advance whether an app injected an app_url field, so we
-  // emit the placeholder div and let loadOverview/refreshOverviewLite
-  // populate or hide it. Keeping the slot fixed means refreshOverviewLite
-  // can patch in/out without re-laying-out the entire tab.
   $('main').innerHTML=`
     ${recoveryBanner()}
     <div class=ph><h1>${t('overview.title')}</h1><div class=desc>${t('overview.desc')}</div></div>
     <div class=card><div class=ctitle>${t('overview.net_label')}</div><div id=netBox></div></div>
     <div class=card><div class=ctitle>${t('overview.res_label')}</div><div id=resBox></div></div>
-    <div id=appBoxWrap></div>
     <div class='mono t-mute' id=supportLine style='font-size:11px;text-align:center;margin-top:14px;cursor:copy' title='${t('overview.copy_hint')}'></div>`;
   await loadOverview();
   // Click anywhere on the support line to copy it. One-line summary that
@@ -882,28 +918,9 @@ async function renderOverview(){
 
 async function refreshOverviewLite(){
   const s=state.status||{};
-  const rb=$('resBox'),nb=$('netBox'),ab=$('appBoxWrap');
+  const rb=$('resBox'),nb=$('netBox');
   if(rb)renderResBox(rb,s);
   if(nb)renderNetBox(nb,s);
-  if(ab)renderAppBox(ab,s);
-}
-
-// App card: chassis doesn't know what the downstream app does, only that
-// it CAN inject an app_url into /api/system/status. When present we
-// render a single card with the configured label + a link. The app's
-// own page (typically /app) hosts whatever settings/state it wants.
-// Hidden entirely when app_url is absent so chassis-only builds don't
-// show an empty card.
-function renderAppBox(wrap,s){
-  if(!s.app_url){wrap.innerHTML='';return;}
-  const label=s.app_label||t('overview.app_label');
-  // app_url is host-relative; we don't validate further — apps choose
-  // their own routes. Open in same tab so the back button returns.
-  wrap.innerHTML=`
-    <div class=card>
-      <div class=ctitle>${label}</div>
-      <a href='${s.app_url}' class=btn style='display:inline-block'>${t('overview.app_open')}</a>
-    </div>`;
 }
 
 function renderNetBox(box,s){
@@ -956,7 +973,6 @@ async function loadOverview(){
   const s=state.status||{};
   if($('resBox'))renderResBox($('resBox'),s);
   if($('netBox'))renderNetBox($('netBox'),s);
-  if($('appBoxWrap'))renderAppBox($('appBoxWrap'),s);
   // Support line: one-line copy-pasteable device summary so a user can
   // share device + version + identity in a support thread without a
   // screenshot. Fields all come from /status; pieces are skipped if

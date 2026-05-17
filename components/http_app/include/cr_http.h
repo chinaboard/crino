@@ -50,18 +50,19 @@ void cr_app_init(void);
 //         cJSON_AddBoolToObject(root, "app_session_active", g_session);
 //     }
 //
-// Two field names are reserved (chassis Overview UI reads them):
+// Two field names are reserved (chassis Web UI reads them):
 //
 //   "app_url"   — host-relative URL of the app's own settings/status
-//                 page (e.g. "/app"). When present, the Overview tab
-//                 renders a card with a link button to that URL so
-//                 users can find the app UI without typing the path.
-//   "app_label" — optional human-readable name for that card title
-//                 (e.g. "ATC Time Sync"). Falls back to a generic
-//                 "App" label when absent.
+//                 page (e.g. "/app"). When present, the chassis sidebar
+//                 adds an extra navigation tab labeled with "app_label"
+//                 (or "App" as a fallback) that loads this URL in an
+//                 iframe inside the chassis layout — so the downstream
+//                 app's UI feels native to the chassis Web UI.
+//   "app_label" — optional human-readable tab title (e.g. "ATC TS",
+//                 "Sensor"). Keep short — sidebar width is ~180px.
 //
-// Apps that have no UI of their own simply don't set "app_url" — the
-// chassis Overview hides the card entirely in that case.
+// Apps with no UI of their own simply don't set these — the chassis
+// sidebar shows only Overview / System in that case.
 void cr_app_status_json(cJSON *root);
 
 #ifdef __cplusplus
